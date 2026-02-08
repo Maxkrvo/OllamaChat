@@ -1,7 +1,7 @@
 # OllamaChat
 
 <p align="center">
-  <img src="public/logo.webp" alt="OllamaChat Logo" width="128" />
+  <img src="public/logoTransparentSmall.webp" alt="OllamaChat Logo" width="256" />
 </p>
 
 A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](https://ollama.ai/). No cloud APIs, no API keys your data stays local.
