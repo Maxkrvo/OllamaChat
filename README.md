@@ -1,12 +1,16 @@
 # OllamaChat
 
-A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](https://ollama.ai/). No cloud APIs, no API keys — your data stays local.
+<p align="center">
+  <img src="public/logo.webp" alt="OllamaChat Logo" width="128" />
+</p>
+
+A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](https://ollama.ai/). No cloud APIs, no API keys your data stays local.
 
 ## Features
 
-- **Chat interface** — streaming responses, markdown with syntax highlighting, conversation history
-- **Smart model routing** — "Auto" mode picks the best model per prompt (code → coder model, complex reasoning → larger model, general → fast default)
-- **Dark mode**, mobile-responsive, conversation management
+- **Chat interface**: streaming responses, markdown with syntax highlighting, conversation history
+- **Smart model routing**: "Auto" mode picks the best model per prompt (code → coder model, complex reasoning → larger model, general → fast default)
+- **Dark mode**: mobile-responsive, conversation management
 
 ## Setup
 
@@ -39,10 +43,10 @@ Open [http://localhost:3000](http://localhost:3000). The SQLite database is crea
 
 ## Customizing
 
-- **Swap models** — any model from [ollama.ai/library](https://ollama.ai/library) works. Pull it and it appears in the dropdown. Change the default in `prisma/schema.prisma`.
-- **Routing logic** — edit `src/lib/router.ts` to change which patterns trigger which models.
-- **System prompt** — modify `src/app/api/chat/route.ts` to prepend instructions to every conversation.
-- **Remote Ollama** — set `OLLAMA_BASE_URL` in `.env` to point at a GPU server running Ollama.
+- **Swap models**: any model from [ollama.ai/library](https://ollama.ai/library) works. Pull it and it appears in the dropdown. Change the default in `prisma/schema.prisma`.
+- **Routing logic**: edit `src/lib/router.ts` to change which patterns trigger which models.
+- **System prompt**: modify `src/app/api/chat/route.ts` to prepend instructions to every conversation.
+- **Remote Ollama**: set `OLLAMA_BASE_URL` in `.env` to point at a GPU server running Ollama.
 
 ## Stack
 

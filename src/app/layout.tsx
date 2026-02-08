@@ -15,6 +15,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Ollama Chat",
   description: "Self-hosted ChatGPT-style interface for local Ollama models",
+  icons: {
+    icon: [
+      { url: "/favicon/favicon-32x32.webp", sizes: "32x32", type: "image/png" },
+      { url: "/favicon/favicon-16x16.webp", sizes: "16x16", type: "image/png" },
+    ],
+    apple: "/favicon/apple-touch-icon.webp",
+    shortcut: "/favicon/favicon.ico",
+  },
 };
 
 export default function RootLayout({

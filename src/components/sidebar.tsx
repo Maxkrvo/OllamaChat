@@ -24,7 +24,7 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <aside className="flex h-full w-64 flex-col border-r border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
-      <div className="p-3">
+      <div className="flex h-14 items-center gap-2 border-b border-zinc-200 px-4 dark:border-zinc-700">
         <button
           onClick={onNew}
           className="w-full rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800"
@@ -33,7 +33,7 @@ export function Sidebar({
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2">
+      <nav className="flex-1 overflow-y-auto px-2 pt-2">
         {conversations.map((c) => (
           <div
             key={c.id}
