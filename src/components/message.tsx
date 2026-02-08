@@ -5,9 +5,10 @@ import rehypeHighlight from "rehype-highlight";
 interface MessageProps {
   role: "user" | "assistant";
   content: string;
+  model?: string | null;
 }
 
-export function Message({ role, content }: MessageProps) {
+export function Message({ role, content, model }: MessageProps) {
   const isUser = role === "user";
 
   return (
@@ -32,6 +33,9 @@ export function Message({ role, content }: MessageProps) {
           </div>
         )}
       </div>
+      {!isUser && model && (
+        <span className="mt-1 block text-xs text-zinc-400">{model}</span>
+      )}
     </div>
   );
 }

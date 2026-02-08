@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { streamChat } from "@/lib/ollama";
+import { routePrompt } from "@/lib/router";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +15,19 @@ export async function POST(req: NextRequest) {
 
     if (!conversation) {
       return new Response("Conversation not found", { status: 404 });
+    }
+
+    // Resolve model: use router for "auto", otherwise use conversation.model
+    let resolvedModel = conversation.model;
+    let routingReason: string | null = null;
+
+    if (conversation.model === "auto") {
+      const routing = routePrompt(message);
+      resolvedModel = routing.model;
+      routingReason = routing.reason;
+      console.log(
+        `[router] "${message.slice(0, 80)}..." → ${resolvedModel} (${routingReason})`
+      );
     }
 
     // Save user message
@@ -36,7 +50,7 @@ export async function POST(req: NextRequest) {
     ];
 
     // Stream from Ollama
-    const ollamaRes = await streamChat(conversation.model, messages);
+    const ollamaRes = await streamChat(resolvedModel, messages);
 
     if (!ollamaRes.ok || !ollamaRes.body) {
       return new Response("Failed to connect to Ollama", { status: 502 });
@@ -49,6 +63,13 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // Send routed model info as first event
+          controller.enqueue(
+            new TextEncoder().encode(
+              `data: ${JSON.stringify({ routedModel: resolvedModel, routingReason })}\n\n`
+            )
+          );
+
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -68,12 +89,13 @@ export async function POST(req: NextRequest) {
                   );
                 }
                 if (json.done) {
-                  // Save assistant message
+                  // Save assistant message with the model that handled it
                   await prisma.message.create({
                     data: {
                       conversationId,
                       role: "assistant",
                       content: fullContent,
+                      model: resolvedModel,
                     },
                   });
 

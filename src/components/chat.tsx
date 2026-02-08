@@ -10,6 +10,7 @@ interface MessageData {
   id: string;
   role: "user" | "assistant";
   content: string;
+  model?: string | null;
 }
 
 interface ConversationData {
@@ -24,7 +25,7 @@ export function Chat() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [input, setInput] = useState("");
-  const [model, setModel] = useState("qwen2.5:14b");
+  const [model, setModel] = useState("auto");
   const [streaming, setStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -153,6 +154,16 @@ export function Chat() {
           if (line.startsWith("data: ")) {
             try {
               const json = JSON.parse(line.slice(6));
+              if (json.routedModel) {
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last.role === "assistant") {
+                    updated[updated.length - 1] = { ...last, model: json.routedModel };
+                  }
+                  return updated;
+                });
+              }
               if (json.content) {
                 setMessages((prev) => {
                   const updated = [...prev];
@@ -265,14 +276,14 @@ export function Chat() {
               <div className="text-center text-zinc-400">
                 <p className="text-lg font-medium">Start a conversation</p>
                 <p className="mt-1 text-sm">
-                  Send a message to begin chatting with {model}
+                  Send a message to begin chatting{model !== "auto" ? ` with ${model}` : ""}
                 </p>
               </div>
             </div>
           )}
           <div className="mx-auto max-w-3xl space-y-4">
             {messages.map((msg, i) => (
-              <Message key={msg.id || i} role={msg.role} content={msg.content} />
+              <Message key={msg.id || i} role={msg.role} content={msg.content} model={msg.model} />
             ))}
             {streaming && messages[messages.length - 1]?.content === "" && (
               <div className="flex justify-start">

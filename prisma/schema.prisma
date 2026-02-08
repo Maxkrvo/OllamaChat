@@ -20,6 +20,7 @@ model Message {
   id             String       @id @default(cuid())
   role           String       // "user" or "assistant"
   content        String
+  model          String?      // which model handled this message (null for user messages)
   createdAt      DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
