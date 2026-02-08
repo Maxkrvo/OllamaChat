@@ -39,7 +39,7 @@ export function Sidebar({
             key={c.id}
             className={`group mb-1 flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm ${
               c.id === activeId
-                ? "bg-zinc-200 dark:bg-zinc-700"
+                ? "bg-zinc-200/80 dark:bg-zinc-600"
                 : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
             }`}
             onClick={() => onSelect(c.id)}
@@ -50,7 +50,7 @@ export function Sidebar({
                 e.stopPropagation();
                 onDelete(c.id);
               }}
-              className="ml-2 hidden rounded p-1 text-zinc-400 hover:text-red-500 group-hover:block"
+              className="ml-2 rounded p-1 text-zinc-400 opacity-0 hover:text-red-500 group-hover:opacity-100"
               aria-label="Delete conversation"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
