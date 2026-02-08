@@ -1,26 +1,138 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:where(.dark, .dark *));
+
+@import "highlight.js/styles/github-dark.min.css";
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Prose styles for markdown rendering */
+.prose {
+  line-height: 1.625;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.prose p {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.prose p:first-child {
+  margin-top: 0;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  font-weight: 600;
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+}
+
+.prose h1 { font-size: 1.5em; }
+.prose h2 { font-size: 1.25em; }
+.prose h3 { font-size: 1.125em; }
+
+.prose ul, .prose ol {
+  padding-left: 1.5em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose ul { list-style-type: disc; }
+.prose ol { list-style-type: decimal; }
+
+.prose li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.prose code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.875em;
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 0.125em 0.25em;
+  border-radius: 0.25em;
+}
+
+:where(.dark) .prose code {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.prose pre {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  padding: 0.75em 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  background-color: #1e1e1e;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.8125em;
+  color: #e5e7eb;
+}
+
+.prose blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 1em;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  color: #6b7280;
+}
+
+:where(.dark) .prose blockquote {
+  border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.prose th, .prose td {
+  border: 1px solid #d1d5db;
+  padding: 0.375em 0.75em;
+  text-align: left;
+}
+
+:where(.dark) .prose th, :where(.dark) .prose td {
+  border-color: #4b5563;
+}
+
+.prose th {
+  font-weight: 600;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+:where(.dark) .prose th {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.prose a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+:where(.dark) .prose a {
+  color: #60a5fa;
+}
+
+.prose hr {
+  border-color: #d1d5db;
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+}
+
+:where(.dark) .prose hr {
+  border-color: #4b5563;
 }
