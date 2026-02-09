@@ -266,7 +266,7 @@ export function Chat() {
         </header>
 
         {/* Messages */}
-        <div className="relative flex-1 overflow-y-auto px-4 py-6">
+        <div className="relative  min-h-0 flex-1 overflow-y-auto px-4 py-6">
           {/* Watermark */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <Image
