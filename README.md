@@ -34,7 +34,6 @@ ollama pull qwen2.5:32b           # complex reasoning (needs ~20GB RAM)
 ### 3. Run
 
 ```bash
-cd web
 pnpm install
 pnpm dev
 ```
