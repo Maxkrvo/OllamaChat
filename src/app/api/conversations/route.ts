@@ -24,7 +24,10 @@ export async function POST(req: NextRequest) {
       model = config.defaultModel;
     }
     const conversation = await prisma.conversation.create({
-      data: { model },
+      data: { 
+        model,
+        ragEnabled: body.ragEnabled ?? true,
+       },
     });
     return NextResponse.json(conversation);
   } catch (err) {

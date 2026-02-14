@@ -34,11 +34,11 @@ model Document {
   filename   String
   filepath   String?
   sourceUrl  String?
-  sourceType String
+  sourceType String   // "markdown" | "text" | "pdf" | "code" | "url"
   mimeType   String?
   fileSize   Int?
-  hash       String
-  status     String   @default("pending")
+  hash       String   // SHA-256 for dedup/change detection
+  status     String   @default("pending") // "pending" | "processing" | "indexed" | "error"
   error      String?
   chunkCount Int      @default(0)
   createdAt  DateTime @default(now())
@@ -55,7 +55,7 @@ model Chunk {
   content    String
   tokenCount Int
   chunkIndex Int
-  metadata   String?
+  metadata   String?  // JSON: { language, startLine, endLine, heading, etc. }
   createdAt  DateTime @default(now())
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 

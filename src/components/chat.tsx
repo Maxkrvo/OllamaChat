@@ -6,13 +6,18 @@ import { Sidebar } from "./sidebar";
 import { ModelSelector } from "./model-selector";
 import { ThemeToggle } from "./theme-toggle";
 import Image from "next/image";
+import { RagToggle } from "./rag-toggle";
+import { RagSettings } from "./rag-settings";
+import { KnowledgeBase } from "./knowledge-base";
 import { SettingsForm } from "./settings-form";
+import type { RagSource } from "./rag-sources";
 
 interface MessageData {
   id: string;
   role: "user" | "assistant";
   content: string;
   model?: string | null;
+  ragSources?: RagSource[];
 }
 
 interface ConversationData {
@@ -28,9 +33,10 @@ export function Chat() {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [input, setInput] = useState("");
   const [model, setModel] = useState("auto");
+  const [ragEnabled, setRagEnabled] = useState(true);
   const [streaming, setStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
+  const [view, setView] = useState<"chat" | "settings" | "knowledge">("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,6 +71,7 @@ export function Chat() {
       .then((data) => {
         setMessages(data.messages || []);
         setModel(data.model);
+        setRagEnabled(data.ragEnabled ?? true);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -101,7 +108,7 @@ export function Chat() {
       const res = await fetch("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model }),
+        body: JSON.stringify({ model, ragEnabled }),
       });
       const conv = await res.json();
       convId = conv.id;
@@ -162,7 +169,11 @@ export function Chat() {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
                   if (last.role === "assistant") {
-                    updated[updated.length - 1] = { ...last, model: json.routedModel };
+                    updated[updated.length - 1] = {
+                      ...last,
+                      model: json.routedModel,
+                      ragSources: json.ragSources?.length ? json.ragSources : undefined,
+                    };
                   }
                   return updated;
                 });
@@ -242,12 +253,21 @@ export function Chat() {
         <Sidebar
           conversations={conversations}
           activeId={activeId}
+          activeView={view}
           onSelect={(id) => {
             setActiveId(id);
+            setView("chat");
             setSidebarOpen(false);
           }}
-          onNew={createConversation}
+          onNew={() => {
+            createConversation();
+            setView("chat");
+          }}
           onDelete={deleteConversation}
+          onNavigate={(v) => {
+            setView(v);
+            setSidebarOpen(false);
+          }}
         />
       </div>
 
@@ -259,32 +279,33 @@ export function Chat() {
         />
       )}
 
-      {/* Main chat area */}
+      {/* Main content area */}
       <div className="flex flex-1 flex-col">
-        {/* Header */}
-        <header className="flex h-14 items-center justify-end gap-3 border-b border-zinc-200 px-4 dark:border-zinc-700">
-          <ModelSelector value={model} onChange={setModel} />
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`rounded-md p-2 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700 ${showSettings ? "bg-zinc-100 dark:bg-zinc-700" : ""}`}
-            aria-label="Settings"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-          <ThemeToggle />
-        </header>
-
-        {showSettings ? (
-          <SettingsForm onClose={() => setShowSettings(false)} />
-        ) : (
+        {view === "chat" ? (
           <>
-            {/* Messages */}
-            <div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-6">
+            {/* Header */}
+            <header className="flex h-14 items-center justify-end gap-3 border-b border-zinc-200 px-4 dark:border-zinc-700">
+              <ModelSelector value={model} onChange={setModel} />
+              <RagToggle
+                enabled={ragEnabled}
+                onChange={(enabled) => {
+                  setRagEnabled(enabled);
+                  if (activeId) {
+                    fetch(`/api/conversations/${activeId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ ragEnabled: enabled }),
+                    });
+                  }
+                }}
+              />
+              <ThemeToggle />
+            </header>
+
+            {/* Messages wrapper */}
+            <div className="relative min-h-0 flex-1">
               {/* Watermark */}
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
                 <Image
                   src="/logoTransparentSmall.webp"
                   alt=""
@@ -293,6 +314,7 @@ export function Chat() {
                   className="h-[60%] max-h-[500px] w-auto opacity-[0.03] dark:opacity-[0.05]"
                 />
               </div>
+              <div className="relative z-10 h-full overflow-y-auto px-4 py-6">
               {messages.length === 0 && (
                 <div className="flex h-full items-center justify-center">
                   <div className="text-center text-zinc-400">
@@ -305,7 +327,7 @@ export function Chat() {
               )}
               <div className="mx-auto max-w-3xl space-y-4">
                 {messages.map((msg, i) => (
-                  <Message key={msg.id || i} role={msg.role} content={msg.content} model={msg.model} />
+                  <Message key={msg.id || i} role={msg.role} content={msg.content} model={msg.model} ragSources={msg.ragSources} />
                 ))}
                 {streaming && messages[messages.length - 1]?.content === "" && (
                   <div className="flex justify-start">
@@ -319,6 +341,7 @@ export function Chat() {
                   </div>
                 )}
                 <div ref={messagesEndRef} />
+              </div>
               </div>
             </div>
 
@@ -342,6 +365,26 @@ export function Chat() {
                   Send
                 </button>
               </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <header className="flex h-14 items-center justify-between border-b border-zinc-200 px-4 dark:border-zinc-700">
+              <span className="text-sm font-semibold">
+                {view === "settings" ? "Settings" : "Knowledge Base"}
+              </span>
+              <ThemeToggle />
+            </header>
+            <div className="flex-1 overflow-y-auto">
+              {view === "settings" ? (
+                <div className="mx-auto max-w-4xl space-y-6 p-6">
+                  <h1 className="text-2xl font-bold">Settings</h1>
+                  <SettingsForm />
+                  <RagSettings />
+                </div>
+              ) : (
+                <KnowledgeBase />
+              )}
             </div>
           </>
         )}

@@ -13,6 +13,33 @@ A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](htt
 - **Configurable models**: set your default, code, and embedding models from the in-app settings panel — works with whatever you have installed
 - **Dark mode**: mobile-responsive, conversation management
 
+<details>
+<summary><strong>Knowledge Base</strong></summary>
+
+Upload documents or paste URLs to build a searchable knowledge base. When RAG is enabled for a conversation, relevant chunks are automatically retrieved and injected into the prompt context.
+
+- **Upload files**: drag-and-drop or file picker (supports `.md`, `.txt`, `.pdf`, `.ts`, `.js`, `.py`, `.go`, `.rs`, `.java`, `.cpp`, `.c`, `.html`, `.css`, `.json`, `.yaml`, `.toml`)
+- **Index URLs**: paste any URL to scrape and index its content
+- **Document management**: view status, chunk count, file size; reindex or delete documents
+- **Test search**: run queries against your indexed documents to verify retrieval quality
+
+</details>
+
+<details>
+<summary><strong>Settings</strong></summary>
+
+Configure the RAG pipeline parameters from the settings page.
+
+- **RAG toggle**: enable or disable RAG globally
+- **Chunk size / overlap**: control how documents are split into chunks (100–2000 tokens, 0–500 overlap)
+- **Top-K results**: number of chunks retrieved per query (1–20)
+- **Similarity threshold**: minimum cosine similarity score for retrieved chunks (0–1)
+- **Embedding model**: select which Ollama model generates embeddings (default: `nomic-embed-text`)
+- **Watched folders**: add local directories for automatic file indexing via file watcher
+- **Supported file types**: toggle which file extensions are indexed
+
+</details>
+
 ## Setup
 
 ### 1. Install Ollama

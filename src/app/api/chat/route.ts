@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { streamChat } from "@/lib/ollama";
 import { routePrompt } from "@/lib/router";
+import { retrieveContext } from "@/lib/rag";
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,13 +42,34 @@ export async function POST(req: NextRequest) {
       data: { updatedAt: new Date() },
     });
 
-    const messages = [
+    const messages: Array<{ role: string; content: string }> = [
       ...conversation.messages.map((m) => ({
         role: m.role,
         content: m.content,
       })),
       { role: "user", content: message },
     ];
+
+    // RAG: retrieve relevant context and inject into system prompt
+    let ragSources: Array<{ filename: string; chunkIndex: number }> = [];
+
+    if (conversation.ragEnabled) {
+      try {
+        const ragContext = await retrieveContext(message);
+        if (ragContext.chunks.length > 0) {
+          messages.unshift({
+            role: "system",
+            content: ragContext.systemPromptAddition,
+          });
+          ragSources = ragContext.chunks.map((c) => ({
+            filename: c.filename,
+            chunkIndex: c.chunkIndex,
+          }));
+        }
+      } catch (err) {
+        console.error("RAG retrieval error (continuing without context):", err);
+      }
+    }
 
     // Stream from Ollama
     const ollamaRes = await streamChat(resolvedModel, messages);
@@ -63,10 +85,10 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send routed model info as first event
+          // Send routed model info + RAG sources as first event
           controller.enqueue(
             new TextEncoder().encode(
-              `data: ${JSON.stringify({ routedModel: resolvedModel, routingReason })}\n\n`
+              `data: ${JSON.stringify({ routedModel: resolvedModel, routingReason, ragSources })}\n\n`
             )
           );
 
