@@ -13,6 +13,7 @@ interface DocumentData {
   error: string | null;
   chunkCount: number;
   createdAt: string;
+  lastCitedAt: string | null;
 }
 
 interface SearchResult {
@@ -164,6 +165,16 @@ export function KnowledgeBase() {
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }
 
+  function formatTimestamp(value: string | null) {
+    if (!value) return "Never";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       <h1 className="text-2xl font-bold">Knowledge Base</h1>
@@ -232,13 +243,14 @@ export function KnowledgeBase() {
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Chunks</th>
               <th className="px-4 py-3 font-medium">Size</th>
+              <th className="px-4 py-3 font-medium">Last Cited</th>
               <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
             {documents.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-zinc-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-zinc-400">
                   No documents indexed yet. Upload files or paste a URL to get started.
                 </td>
               </tr>
@@ -262,6 +274,7 @@ export function KnowledgeBase() {
                 </td>
                 <td className="px-4 py-3 text-zinc-500">{doc.chunkCount}</td>
                 <td className="px-4 py-3 text-zinc-500">{formatSize(doc.fileSize)}</td>
+                <td className="px-4 py-3 text-zinc-500">{formatTimestamp(doc.lastCitedAt)}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1">
                     <button

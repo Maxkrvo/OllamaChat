@@ -44,7 +44,9 @@ next-env.d.ts
 
 # database
 dev.db
-migration.sql
 
 # rag uploads
 /uploads
+
+# local eval drafts generated from real usage
+evals/datasets/grounding.draft.jsonl

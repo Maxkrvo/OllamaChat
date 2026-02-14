@@ -1,0 +1,12 @@
+{"id":"seed-001","query":"What does this app use for vector search?","expected_sources":["vector-db.ts"],"expect_confidence":"high"}
+{"id":"seed-002","query":"How are documents chunked before embeddings are generated?","expected_sources":["chunker.ts"],"expect_confidence":"high"}
+{"id":"seed-003","query":"How can I configure chunk size and overlap?","expected_sources":["rag-settings.tsx","config.ts"],"expect_confidence":"medium"}
+{"id":"seed-004","query":"Which endpoint handles chat streaming?","expected_sources":["api/chat/route.ts"],"expect_confidence":"high"}
+{"id":"seed-005","query":"How do I enable or disable RAG for a conversation?","expected_sources":["chat.tsx","api/conversations/[id]/route.ts"],"expect_confidence":"medium"}
+{"id":"seed-006","query":"Where are system prompts stored?","expected_sources":["schema.prisma","chat.tsx"],"expect_confidence":"medium"}
+{"id":"seed-007","query":"What happened in world news today?","expected_sources":[],"expect_confidence":"low"}
+{"id":"seed-008","query":"Who won the most recent Champions League final?","expected_sources":[],"expect_confidence":"low"}
+{"id":"seed-009","query":"What is our company PTO policy?","expected_sources":[],"expect_confidence":"low"}
+{"id":"seed-010","query":"Summarize the unindexed private memo from yesterday.","expected_sources":[],"expect_confidence":"low"}
+{"id":"seed-011","query":"How do I set up the database from scratch?","expected_sources":["README.md","package.json"],"expect_confidence":"medium"}
+{"id":"seed-012","query":"Where is the RAG document upload API implemented?","expected_sources":["api/rag/documents/route.ts"],"expect_confidence":"high"}

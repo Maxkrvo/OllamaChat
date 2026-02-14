@@ -23,9 +23,14 @@ model Message {
   role           String       // "user" or "assistant"
   content        String
   model          String?      // which model handled this message (null for user messages)
+  groundingConfidence String? // "high" | "medium" | "low"
+  groundingReason     String?
+  groundingAvgSimilarity Float?
+  groundingUsedChunkCount Int?
   createdAt      DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
+  citations      MessageCitation[]
 
   @@index([conversationId])
 }
@@ -45,6 +50,7 @@ model Document {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   chunks     Chunk[]
+  citations  MessageCitation[]
 
   @@index([hash])
   @@index([status])
@@ -60,6 +66,22 @@ model Chunk {
   createdAt  DateTime @default(now())
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
+  @@index([documentId])
+}
+
+model MessageCitation {
+  id         String   @id @default(cuid())
+  messageId  String
+  documentId String
+  filename   String
+  chunkIndex Int
+  score      Float
+  metadata   String?
+  createdAt  DateTime @default(now())
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
   @@index([documentId])
 }
 

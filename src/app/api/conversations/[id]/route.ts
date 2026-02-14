@@ -9,7 +9,14 @@ export async function GET(
   const conversation = await prisma.conversation.findUnique({
     where: { id },
     include: {
-      messages: { orderBy: { createdAt: "asc" } },
+      messages: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          citations: {
+            orderBy: { score: "desc" },
+          },
+        },
+      },
     },
   });
   if (!conversation) {

@@ -6,6 +6,7 @@ import {
   buildMessages,
   injectSystemPrompt,
   injectRagContext,
+  injectGroundingPolicy,
 } from "@/lib/chat";
 
 export async function POST(req: NextRequest) {
@@ -39,11 +40,12 @@ export async function POST(req: NextRequest) {
     // Build message array with context injections
     const messages = buildMessages(conversation.messages, message);
     injectSystemPrompt(messages, conversation.systemPrompt);
-    const ragSources = await injectRagContext(
+    const { ragSources, grounding } = await injectRagContext(
       messages,
       message,
       conversation.ragEnabled
     );
+    injectGroundingPolicy(messages, grounding, conversation.ragEnabled);
 
     // Stream from Ollama
     const ollamaRes = await streamChat(resolvedModel, messages);
@@ -61,7 +63,12 @@ export async function POST(req: NextRequest) {
         try {
           controller.enqueue(
             new TextEncoder().encode(
-              `data: ${JSON.stringify({ routedModel: resolvedModel, routingReason, ragSources })}\n\n`
+              `data: ${JSON.stringify({
+                routedModel: resolvedModel,
+                routingReason,
+                ragSources,
+                grounding,
+              })}\n\n`
             )
           );
 
@@ -90,6 +97,21 @@ export async function POST(req: NextRequest) {
                       role: "assistant",
                       content: fullContent,
                       model: resolvedModel,
+                      groundingConfidence: grounding.confidence,
+                      groundingReason: grounding.reason,
+                      groundingAvgSimilarity: grounding.avgSimilarity,
+                      groundingUsedChunkCount: grounding.usedChunkCount,
+                      citations: ragSources.length
+                        ? {
+                            create: dedupeCitations(ragSources).map((source) => ({
+                              documentId: source.documentId,
+                              filename: source.filename,
+                              chunkIndex: source.chunkIndex,
+                              score: source.score,
+                              metadata: JSON.stringify(source.metadata),
+                            })),
+                          }
+                        : undefined,
                     },
                   });
 
@@ -137,4 +159,22 @@ export async function POST(req: NextRequest) {
     console.error("Chat API error:", err);
     return new Response("Internal server error", { status: 500 });
   }
+}
+
+function dedupeCitations(
+  ragSources: Array<{
+    documentId: string;
+    filename: string;
+    chunkIndex: number;
+    score: number;
+    metadata: Record<string, unknown>;
+  }>
+) {
+  const seen = new Set<string>();
+  return ragSources.filter((source) => {
+    const key = `${source.documentId}:${source.chunkIndex}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

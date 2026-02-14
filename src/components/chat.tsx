@@ -10,14 +10,15 @@ import { RagToggle } from "./rag-toggle";
 import { RagSettings } from "./rag-settings";
 import { KnowledgeBase } from "./knowledge-base";
 import { SettingsForm } from "./settings-form";
-import type { RagSource } from "./rag-sources";
+import type { GroundingInfo, MessageCitation } from "./message";
 
 interface MessageData {
   id: string;
   role: "user" | "assistant";
   content: string;
   model?: string | null;
-  ragSources?: RagSource[];
+  citations?: MessageCitation[];
+  grounding?: GroundingInfo;
 }
 
 interface ConversationData {
@@ -25,6 +26,18 @@ interface ConversationData {
   title: string;
   model: string;
   updatedAt: string;
+}
+
+interface ApiConversationMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  model?: string | null;
+  groundingConfidence?: "high" | "medium" | "low" | null;
+  groundingReason?: string | null;
+  groundingAvgSimilarity?: number | null;
+  groundingUsedChunkCount?: number | null;
+  citations?: MessageCitation[];
 }
 
 export function Chat() {
@@ -72,7 +85,30 @@ export function Chat() {
     fetch(`/api/conversations/${activeId}`)
       .then((r) => r.json())
       .then((data) => {
-        setMessages(data.messages || []);
+        const mappedMessages: MessageData[] = (data.messages || []).map(
+          (message: ApiConversationMessage) => {
+            const grounding = message.groundingConfidence
+              ? {
+                  confidence: message.groundingConfidence,
+                  reason: message.groundingReason || "No grounding reason provided.",
+                  avgSimilarity: message.groundingAvgSimilarity ?? null,
+                  usedChunkCount: message.groundingUsedChunkCount ?? 0,
+                }
+              : undefined;
+            const citations = message.citations?.length
+              ? message.citations
+              : undefined;
+            return {
+              id: message.id,
+              role: message.role,
+              content: message.content,
+              model: message.model,
+              citations,
+              grounding,
+            };
+          }
+        );
+        setMessages(mappedMessages);
         setModel(data.model);
         setRagEnabled(data.ragEnabled ?? true);
         setSystemPrompt(data.systemPrompt ?? "");
@@ -169,15 +205,23 @@ export function Chat() {
           if (line.startsWith("data: ")) {
             try {
               const json = JSON.parse(line.slice(6));
-              if (json.routedModel) {
+              if ("grounding" in json || "routedModel" in json || "ragSources" in json) {
                 setMessages((prev) => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
                   if (last.role === "assistant") {
+                    const citations: MessageCitation[] | undefined = json.ragSources?.length
+                      ? json.ragSources.map((s: { filename: string; chunkIndex: number; score?: number }) => ({
+                          filename: s.filename,
+                          chunkIndex: s.chunkIndex,
+                          score: s.score ?? 0,
+                        }))
+                      : undefined;
                     updated[updated.length - 1] = {
                       ...last,
-                      model: json.routedModel,
-                      ragSources: json.ragSources?.length ? json.ragSources : undefined,
+                      model: json.routedModel ?? null,
+                      citations,
+                      grounding: json.grounding ?? last.grounding,
                     };
                   }
                   return updated;
@@ -381,7 +425,14 @@ export function Chat() {
               )}
               <div className="mx-auto max-w-3xl space-y-4">
                 {messages.map((msg, i) => (
-                  <Message key={msg.id || i} role={msg.role} content={msg.content} model={msg.model} ragSources={msg.ragSources} />
+                  <Message
+                    key={msg.id || i}
+                    role={msg.role}
+                    content={msg.content}
+                    model={msg.model}
+                    citations={msg.citations}
+                    grounding={msg.grounding}
+                  />
                 ))}
                 {streaming && messages[messages.length - 1]?.content === "" && (
                   <div className="flex justify-start">

@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:setup": "prisma migrate dev && tsx src/lib/rag/setup-vectors.ts"
+    "db:setup": "prisma migrate dev && tsx src/lib/rag/setup-vectors.ts",
+    "eval:grounding": "node evals/run-grounding.mjs",
+    "eval:grounding:export": "node evals/export-grounding-candidates.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",

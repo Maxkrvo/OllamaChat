@@ -11,6 +11,7 @@ A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](htt
 - **Chat interface**: streaming responses, markdown with syntax highlighting, conversation history
 - **Smart model routing**: "Auto" mode detects code patterns and routes to your configured code model automatically
 - **System prompts**: set a custom system prompt per conversation to control the model's behavior
+- **Grounded responses**: assistant messages include confidence + citations when RAG context is used
 - **Configurable models**: set your default, code, and embedding models from the in-app settings panel — works with whatever you have installed
 - **Dark mode**: mobile-responsive, conversation management
 
@@ -23,6 +24,7 @@ Upload documents or paste URLs to build a searchable knowledge base. When RAG is
 - **Index URLs**: paste any URL to scrape and index its content
 - **Document management**: view status, chunk count, file size; reindex or delete documents
 - **Test search**: run queries against your indexed documents to verify retrieval quality
+- **Last cited visibility**: knowledge base table shows when each document was last cited in chat
 
 </details>
 
@@ -88,6 +90,26 @@ On first run, the app auto-detects your installed models and picks defaults.
 - **Routing logic**: edit `src/lib/router.ts` to change which patterns trigger the code model.
 - **System prompt**: click the "System Prompt" toggle below the chat header to set per conversation instructions.
 - **Remote Ollama**: set `OLLAMA_BASE_URL` in `.env` to point at a GPU server running Ollama.
+
+## Grounding and Citations
+
+When RAG is enabled, assistant messages show an **experimental** confidence label (high / medium / low) and cite the source documents used. When no relevant sources are found, the model still responds but is instructed to flag uncertainty.
+
+## Evals
+
+```bash
+pnpm eval:grounding
+```
+
+Runs retrieval checks from `evals/datasets/grounding.jsonl`.
+- Writes report to `evals/reports/grounding-baseline.json`
+- Skips when app is unreachable (use `EVAL_STRICT=1` to fail instead)
+
+```bash
+pnpm eval:grounding:export
+```
+
+Exports draft low-confidence cases from local usage to `evals/datasets/grounding.draft.jsonl`.
 
 ## Architecture
 

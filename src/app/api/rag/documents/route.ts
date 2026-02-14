@@ -18,9 +18,29 @@ export async function GET() {
       error: true,
       chunkCount: true,
       createdAt: true,
+      citations: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          createdAt: true,
+        },
+      },
     },
   });
-  return NextResponse.json(documents);
+  return NextResponse.json(
+    documents.map((doc) => ({
+      id: doc.id,
+      filename: doc.filename,
+      sourceType: doc.sourceType,
+      sourceUrl: doc.sourceUrl,
+      fileSize: doc.fileSize,
+      status: doc.status,
+      error: doc.error,
+      chunkCount: doc.chunkCount,
+      createdAt: doc.createdAt,
+      lastCitedAt: doc.citations[0]?.createdAt ?? null,
+    }))
+  );
 }
 
 export async function POST(req: NextRequest) {

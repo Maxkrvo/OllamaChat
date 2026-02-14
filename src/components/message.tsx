@@ -1,16 +1,38 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { RagSources, type RagSource } from "./rag-sources";
+import { RagSources } from "./rag-sources";
+
+export interface MessageCitation {
+  id?: string;
+  documentId?: string;
+  filename: string;
+  chunkIndex: number;
+  score: number;
+}
+
+export interface GroundingInfo {
+  confidence: "high" | "medium" | "low";
+  avgSimilarity: number | null;
+  usedChunkCount: number;
+  reason: string;
+}
 
 interface MessageProps {
   role: "user" | "assistant";
   content: string;
   model?: string | null;
-  ragSources?: RagSource[];
+  citations?: MessageCitation[];
+  grounding?: GroundingInfo;
 }
 
-export function Message({ role, content, model, ragSources }: MessageProps) {
+export function Message({
+  role,
+  content,
+  model,
+  citations,
+  grounding,
+}: MessageProps) {
   const isUser = role === "user";
 
   return (
@@ -37,12 +59,33 @@ export function Message({ role, content, model, ragSources }: MessageProps) {
           )}
         </div>
         {!isUser && (
-          <div className="flex items-center gap-2 mt-1">
-            {model && (
-              <span className="text-xs text-zinc-400">{model}</span>
-            )}
-            {ragSources && ragSources.length > 0 && (
-              <RagSources sources={ragSources} />
+          <div className="mt-1">
+            <div className="flex items-center gap-2">
+              {model && (
+                <span className="text-xs text-zinc-400">{model}</span>
+              )}
+              {grounding && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                    grounding.confidence === "high"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      : grounding.confidence === "medium"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                        : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200"
+                  }`}
+                  title={grounding.reason}
+                >
+                  {grounding.confidence} confidence (exp)
+                </span>
+              )}
+              {grounding?.avgSimilarity !== null && grounding?.avgSimilarity !== undefined && (
+                <span className="text-xs text-zinc-400">
+                  sim {grounding.avgSimilarity.toFixed(2)}
+                </span>
+              )}
+            </div>
+            {citations && citations.length > 0 && (
+              <RagSources sources={citations} />
             )}
           </div>
         )}
