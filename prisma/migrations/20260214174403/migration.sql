@@ -15,6 +15,10 @@ CREATE TABLE "Message" (
     "role" TEXT NOT NULL,
     "content" TEXT NOT NULL,
     "model" TEXT,
+    "groundingConfidence" TEXT,
+    "groundingReason" TEXT,
+    "groundingAvgSimilarity" REAL,
+    "groundingUsedChunkCount" INTEGER,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "conversationId" TEXT NOT NULL,
     CONSTRAINT "Message_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -70,6 +74,20 @@ CREATE TABLE "AppConfig" (
     "embeddingModel" TEXT NOT NULL DEFAULT ''
 );
 
+-- CreateTable
+CREATE TABLE "MessageCitation" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "messageId" TEXT NOT NULL,
+    "documentId" TEXT NOT NULL,
+    "filename" TEXT NOT NULL,
+    "chunkIndex" INTEGER NOT NULL,
+    "score" REAL NOT NULL,
+    "metadata" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "MessageCitation_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "Message" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "MessageCitation_documentId_fkey" FOREIGN KEY ("documentId") REFERENCES "Document" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE INDEX "Message_conversationId_idx" ON "Message"("conversationId");
 
@@ -81,3 +99,9 @@ CREATE INDEX "Document_status_idx" ON "Document"("status");
 
 -- CreateIndex
 CREATE INDEX "Chunk_documentId_idx" ON "Chunk"("documentId");
+
+-- CreateIndex
+CREATE INDEX "MessageCitation_messageId_idx" ON "MessageCitation"("messageId");
+
+-- CreateIndex
+CREATE INDEX "MessageCitation_documentId_idx" ON "MessageCitation"("documentId");
