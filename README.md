@@ -9,7 +9,8 @@ A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](htt
 ## Features
 
 - **Chat interface**: streaming responses, markdown with syntax highlighting, conversation history
-- **Smart model routing**: "Auto" mode picks the best model per prompt (code → coder model, complex reasoning → larger model, general → fast default)
+- **Smart model routing**: "Auto" mode detects code patterns and routes to your configured code model automatically
+- **Configurable models**: set your default, code, and embedding models from the in-app settings panel — works with whatever you have installed
 - **Dark mode**: mobile-responsive, conversation management
 
 ## Setup
@@ -21,29 +22,40 @@ brew install ollama   # or download from ollama.ai
 ollama serve          # or open the desktop app
 ```
 
-### 2. Pull models
+### 2. Pull any models you want
 
 ```bash
-ollama pull qwen2.5:14b           # default chat model (~9GB)
-
-# Optional — used by smart router
-ollama pull qwen2.5-coder:14b     # coding tasks
-ollama pull qwen2.5:32b           # complex reasoning (needs ~20GB RAM)
+ollama pull gemma2:9b          # lightweight general model
+ollama pull qwen3:14b          # larger general model
+ollama pull qwen3-coder:30b    # coding specialist
+ollama pull nomic-embed-text   # embeddings for RAG
 ```
+
+Any model from [ollama.ai/library](https://ollama.ai/library) works. Pull it and it appears in the app.
 
 ### 3. Run
 
 ```bash
 pnpm install
+pnpm prisma db push
 pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). The SQLite database is created automatically.
 
+### 4. Configure models
+
+Click the gear icon in the header to open settings. Choose which of your installed models to use for:
+
+- **Default Model** — general conversations
+- **Code Model** — used by Auto mode when code is detected in your prompt
+- **Embedding Model** — used for RAG document embeddings
+
+On first run, the app auto-detects your installed models and picks defaults.
+
 ## Customizing
 
-- **Swap models**: any model from [ollama.ai/library](https://ollama.ai/library) works. Pull it and it appears in the dropdown. Change the default in `prisma/schema.prisma`.
-- **Routing logic**: edit `src/lib/router.ts` to change which patterns trigger which models.
+- **Routing logic**: edit `src/lib/router.ts` to change which patterns trigger the code model.
 - **System prompt**: modify `src/app/api/chat/route.ts` to prepend instructions to every conversation.
 - **Remote Ollama**: set `OLLAMA_BASE_URL` in `.env` to point at a GPU server running Ollama.
 

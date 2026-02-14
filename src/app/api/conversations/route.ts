@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getAppConfig } from "@/lib/config";
 
 export async function GET() {
   try {
@@ -17,8 +18,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    let model = body.model;
+    if (!model) {
+      const config = await getAppConfig();
+      model = config.defaultModel;
+    }
     const conversation = await prisma.conversation.create({
-      data: { model: body.model || "qwen2.5:14b" },
+      data: { model },
     });
     return NextResponse.json(conversation);
   } catch (err) {

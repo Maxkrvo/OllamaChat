@@ -6,6 +6,7 @@ import { Sidebar } from "./sidebar";
 import { ModelSelector } from "./model-selector";
 import { ThemeToggle } from "./theme-toggle";
 import Image from "next/image";
+import { SettingsForm } from "./settings-form";
 
 interface MessageData {
   id: string;
@@ -29,6 +30,7 @@ export function Chat() {
   const [model, setModel] = useState("auto");
   const [streaming, setStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -262,71 +264,87 @@ export function Chat() {
         {/* Header */}
         <header className="flex h-14 items-center justify-end gap-3 border-b border-zinc-200 px-4 dark:border-zinc-700">
           <ModelSelector value={model} onChange={setModel} />
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className={`rounded-md p-2 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700 ${showSettings ? "bg-zinc-100 dark:bg-zinc-700" : ""}`}
+            aria-label="Settings"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
           <ThemeToggle />
         </header>
 
-        {/* Messages */}
-        <div className="relative  min-h-0 flex-1 overflow-y-auto px-4 py-6">
-          {/* Watermark */}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <Image
-              src="/logoTransparentSmall.webp"
-              alt=""
-              width={500}
-              height={500}
-              className="h-[60%] max-h-[500px] w-auto opacity-[0.03] dark:opacity-[0.05]"
-            />
-          </div>
-          {messages.length === 0 && (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center text-zinc-400">
-                <p className="text-lg font-medium">Start a conversation</p>
-                <p className="mt-1 text-sm">
-                  Send a message to begin chatting{model !== "auto" ? ` with ${model}` : ""}
-                </p>
+        {showSettings ? (
+          <SettingsForm onClose={() => setShowSettings(false)} />
+        ) : (
+          <>
+            {/* Messages */}
+            <div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-6">
+              {/* Watermark */}
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <Image
+                  src="/logoTransparentSmall.webp"
+                  alt=""
+                  width={500}
+                  height={500}
+                  className="h-[60%] max-h-[500px] w-auto opacity-[0.03] dark:opacity-[0.05]"
+                />
               </div>
-            </div>
-          )}
-          <div className="mx-auto max-w-3xl space-y-4">
-            {messages.map((msg, i) => (
-              <Message key={msg.id || i} role={msg.role} content={msg.content} model={msg.model} />
-            ))}
-            {streaming && messages[messages.length - 1]?.content === "" && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl bg-zinc-100 px-4 py-3 dark:bg-zinc-800">
-                  <div className="flex gap-1">
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:0ms]" />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:150ms]" />
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:300ms]" />
+              {messages.length === 0 && (
+                <div className="flex h-full items-center justify-center">
+                  <div className="text-center text-zinc-400">
+                    <p className="text-lg font-medium">Start a conversation</p>
+                    <p className="mt-1 text-sm">
+                      Send a message to begin chatting{model !== "auto" ? ` with ${model}` : ""}
+                    </p>
                   </div>
                 </div>
+              )}
+              <div className="mx-auto max-w-3xl space-y-4">
+                {messages.map((msg, i) => (
+                  <Message key={msg.id || i} role={msg.role} content={msg.content} model={msg.model} />
+                ))}
+                {streaming && messages[messages.length - 1]?.content === "" && (
+                  <div className="flex justify-start">
+                    <div className="rounded-2xl bg-zinc-100 px-4 py-3 dark:bg-zinc-800">
+                      <div className="flex gap-1">
+                        <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:0ms]" />
+                        <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:150ms]" />
+                        <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:300ms]" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
+            </div>
 
-        {/* Input */}
-        <div className="border-t border-zinc-200 px-4 py-3 dark:border-zinc-700">
-          <div className="mx-auto flex max-w-3xl items-end gap-2">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={handleInput}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
-              rows={1}
-              className="flex-1 resize-none rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm focus:border-blue-500 focus:outline-none dark:border-zinc-600 dark:bg-zinc-800"
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!input.trim() || streaming}
-              className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-            >
-              Send
-            </button>
-          </div>
-        </div>
+            {/* Input */}
+            <div className="border-t border-zinc-200 px-4 py-3 dark:border-zinc-700">
+              <div className="mx-auto flex max-w-3xl items-end gap-2">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={handleInput}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type a message..."
+                  rows={1}
+                  className="flex-1 resize-none rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm focus:border-blue-500 focus:outline-none dark:border-zinc-600 dark:bg-zinc-800"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || streaming}
+                  className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

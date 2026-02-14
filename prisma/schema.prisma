@@ -8,12 +8,13 @@ datasource db {
 }
 
 model Conversation {
-  id        String    @id @default(cuid())
-  title     String    @default("New Chat")
-  model     String    @default("qwen2.5:14b")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  messages  Message[]
+  id         String    @id @default(cuid())
+  title      String    @default("New Chat")
+  model      String    @default("auto")
+  ragEnabled Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  messages   Message[]
 }
 
 model Message {
@@ -26,4 +27,56 @@ model Message {
   conversationId String
 
   @@index([conversationId])
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  filename   String
+  filepath   String?
+  sourceUrl  String?
+  sourceType String
+  mimeType   String?
+  fileSize   Int?
+  hash       String
+  status     String   @default("pending")
+  error      String?
+  chunkCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  chunks     Chunk[]
+
+  @@index([hash])
+  @@index([status])
+}
+
+model Chunk {
+  id         String   @id @default(cuid())
+  documentId String
+  content    String
+  tokenCount Int
+  chunkIndex Int
+  metadata   String?
+  createdAt  DateTime @default(now())
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+model RagConfig {
+  id                  String  @id @default("default")
+  chunkSize           Int     @default(500)
+  chunkOverlap        Int     @default(50)
+  topK                Int     @default(5)
+  similarityThreshold Float   @default(0.7)
+  embeddingModel      String  @default("nomic-embed-text")
+  ragEnabled          Boolean @default(true)
+  watchedFolders      String  @default("[]")
+  supportedTypes      String  @default("[\"md\",\"txt\",\"pdf\",\"ts\",\"js\",\"py\",\"go\",\"rs\",\"java\",\"cpp\",\"c\",\"html\",\"css\",\"json\",\"yaml\",\"toml\"]")
+}
+
+model AppConfig {
+  id             String @id @default("singleton")
+  defaultModel   String @default("")
+  codeModel      String @default("")
+  embeddingModel String @default("")
 }

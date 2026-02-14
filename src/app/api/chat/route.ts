@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     let routingReason: string | null = null;
 
     if (conversation.model === "auto") {
-      const routing = routePrompt(message);
+      const routing = await routePrompt(message);
       resolvedModel = routing.model;
       routingReason = routing.reason;
       console.log(
