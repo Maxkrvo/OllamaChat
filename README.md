@@ -10,6 +10,7 @@ A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](htt
 
 - **Chat interface**: streaming responses, markdown with syntax highlighting, conversation history
 - **Smart model routing**: "Auto" mode detects code patterns and routes to your configured code model automatically
+- **System prompts**: set a custom system prompt per conversation to control the model's behavior
 - **Configurable models**: set your default, code, and embedding models from the in-app settings panel — works with whatever you have installed
 - **Dark mode**: mobile-responsive, conversation management
 
@@ -64,11 +65,13 @@ Any model from [ollama.ai/library](https://ollama.ai/library) works. Pull it and
 
 ```bash
 pnpm install
-pnpm prisma db push
+pnpm db:setup
 pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). The SQLite database is created automatically.
+
+`pnpm db:setup` runs Prisma migrations and sets up the vector column for RAG embeddings.
 
 ### 4. Configure models
 
@@ -83,8 +86,27 @@ On first run, the app auto-detects your installed models and picks defaults.
 ## Customizing
 
 - **Routing logic**: edit `src/lib/router.ts` to change which patterns trigger the code model.
-- **System prompt**: modify `src/app/api/chat/route.ts` to prepend instructions to every conversation.
+- **System prompt**: click the "System Prompt" toggle below the chat header to set per conversation instructions.
 - **Remote Ollama**: set `OLLAMA_BASE_URL` in `.env` to point at a GPU server running Ollama.
+
+## Architecture
+
+```
+src/lib/
+├── chat/              # Chat pipeline helpers
+│   ├── resolve-model  # Smart router wrapper (auto → code/default model)
+│   ├── context        # Message building, system prompt + RAG injection
+│   └── index          # Barrel exports
+├── rag/               # RAG pipeline
+│   ├── embeddings     # Ollama embedding API
+│   ├── vector-db      # libSQL vector search
+│   ├── chunker        # Document-aware chunking
+│   └── parsers/       # Markdown, PDF, code, URL parsers
+├── router             # Pattern-matching code detection
+├── ollama             # Ollama HTTP API wrapper
+├── config             # App configuration (DB-backed)
+└── db                 # Prisma client singleton
+```
 
 ## Stack
 

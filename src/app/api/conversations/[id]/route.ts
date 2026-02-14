@@ -36,6 +36,7 @@ export async function PATCH(
   const data: Record<string, unknown> = {};
   if (body.ragEnabled !== undefined) data.ragEnabled = body.ragEnabled;
   if (body.model !== undefined) data.model = body.model;
+  if (body.systemPrompt !== undefined) data.systemPrompt = body.systemPrompt;
   const updated = await prisma.conversation.update({
     where: { id },
     data,

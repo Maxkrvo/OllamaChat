@@ -37,8 +37,11 @@ export function Chat() {
   const [streaming, setStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [view, setView] = useState<"chat" | "settings" | "knowledge">("chat");
+  const [systemPrompt, setSystemPrompt] = useState<string>("");
+  const [systemPromptOpen, setSystemPromptOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const systemPromptTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -72,6 +75,8 @@ export function Chat() {
         setMessages(data.messages || []);
         setModel(data.model);
         setRagEnabled(data.ragEnabled ?? true);
+        setSystemPrompt(data.systemPrompt ?? "");
+        setSystemPromptOpen(!!data.systemPrompt);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
@@ -231,6 +236,20 @@ export function Chat() {
     ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
   }
 
+  function handleSystemPromptChange(value: string) {
+    setSystemPrompt(value);
+    if (systemPromptTimer.current) clearTimeout(systemPromptTimer.current);
+    systemPromptTimer.current = setTimeout(() => {
+      if (activeId) {
+        fetch(`/api/conversations/${activeId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ systemPrompt: value || null }),
+        });
+      }
+    }, 500);
+  }
+
   return (
     <div className="flex h-screen bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
       {/* Mobile sidebar toggle */}
@@ -301,6 +320,41 @@ export function Chat() {
               />
               <ThemeToggle />
             </header>
+
+            {/* System prompt */}
+            {activeId && (
+              <div className="border-b border-zinc-200 dark:border-zinc-700">
+                <button
+                  onClick={() => setSystemPromptOpen(!systemPromptOpen)}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                >
+                  <svg
+                    className={`h-3 w-3 transition-transform ${systemPromptOpen ? "rotate-90" : ""}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  System Prompt
+                  {systemPrompt && !systemPromptOpen && (
+                    <span className="truncate text-zinc-400">&mdash; {systemPrompt.slice(0, 60)}</span>
+                  )}
+                </button>
+                {systemPromptOpen && (
+                  <div className="px-4 pb-3">
+                    <textarea
+                      value={systemPrompt}
+                      onChange={(e) => handleSystemPromptChange(e.target.value)}
+                      placeholder="e.g. You are a helpful coding assistant that always explains your reasoning..."
+                      rows={3}
+                      className="w-full resize-none rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-zinc-600 dark:bg-zinc-800"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Messages wrapper */}
             <div className="relative min-h-0 flex-1">

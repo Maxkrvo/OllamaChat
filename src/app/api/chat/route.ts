@@ -1,14 +1,17 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { streamChat } from "@/lib/ollama";
-import { routePrompt } from "@/lib/router";
-import { retrieveContext } from "@/lib/rag";
+import {
+  resolveModel,
+  buildMessages,
+  injectSystemPrompt,
+  injectRagContext,
+} from "@/lib/chat";
 
 export async function POST(req: NextRequest) {
   try {
     const { conversationId, message } = await req.json();
 
-    // Verify conversation exists and get history
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
       include: { messages: { orderBy: { createdAt: "asc" } } },
@@ -18,58 +21,29 @@ export async function POST(req: NextRequest) {
       return new Response("Conversation not found", { status: 404 });
     }
 
-    // Resolve model: use router for "auto", otherwise use conversation.model
-    let resolvedModel = conversation.model;
-    let routingReason: string | null = null;
+    // Resolve model
+    const { model: resolvedModel, reason: routingReason } = await resolveModel(
+      conversation.model,
+      message
+    );
 
-    if (conversation.model === "auto") {
-      const routing = await routePrompt(message);
-      resolvedModel = routing.model;
-      routingReason = routing.reason;
-      console.log(
-        `[router] "${message.slice(0, 80)}..." → ${resolvedModel} (${routingReason})`
-      );
-    }
-
-    // Save user message
+    // Save user message + update timestamp
     await prisma.message.create({
       data: { conversationId, role: "user", content: message },
     });
-
-    // Update conversation timestamp
     await prisma.conversation.update({
       where: { id: conversationId },
       data: { updatedAt: new Date() },
     });
 
-    const messages: Array<{ role: string; content: string }> = [
-      ...conversation.messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
-      { role: "user", content: message },
-    ];
-
-    // RAG: retrieve relevant context and inject into system prompt
-    let ragSources: Array<{ filename: string; chunkIndex: number }> = [];
-
-    if (conversation.ragEnabled) {
-      try {
-        const ragContext = await retrieveContext(message);
-        if (ragContext.chunks.length > 0) {
-          messages.unshift({
-            role: "system",
-            content: ragContext.systemPromptAddition,
-          });
-          ragSources = ragContext.chunks.map((c) => ({
-            filename: c.filename,
-            chunkIndex: c.chunkIndex,
-          }));
-        }
-      } catch (err) {
-        console.error("RAG retrieval error (continuing without context):", err);
-      }
-    }
+    // Build message array with context injections
+    const messages = buildMessages(conversation.messages, message);
+    injectSystemPrompt(messages, conversation.systemPrompt);
+    const ragSources = await injectRagContext(
+      messages,
+      message,
+      conversation.ragEnabled
+    );
 
     // Stream from Ollama
     const ollamaRes = await streamChat(resolvedModel, messages);
@@ -85,7 +59,6 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send routed model info + RAG sources as first event
           controller.enqueue(
             new TextEncoder().encode(
               `data: ${JSON.stringify({ routedModel: resolvedModel, routingReason, ragSources })}\n\n`
@@ -111,7 +84,6 @@ export async function POST(req: NextRequest) {
                   );
                 }
                 if (json.done) {
-                  // Save assistant message with the model that handled it
                   await prisma.message.create({
                     data: {
                       conversationId,
@@ -121,7 +93,7 @@ export async function POST(req: NextRequest) {
                     },
                   });
 
-                  // Auto-title from first user message if still default
+                  // Auto-title from first user message
                   if (conversation.title === "New Chat") {
                     const firstUserMsg = conversation.messages.find(
                       (m) => m.role === "user"

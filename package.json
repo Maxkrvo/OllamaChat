@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:setup": "prisma migrate dev && tsx src/lib/rag/setup-vectors.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",

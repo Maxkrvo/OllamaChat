@@ -11,10 +11,11 @@ model Conversation {
   id         String    @id @default(cuid())
   title      String    @default("New Chat")
   model      String    @default("auto")
-  ragEnabled Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  messages   Message[]
+  ragEnabled   Boolean   @default(true)
+  systemPrompt String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  messages     Message[]
 }
 
 model Message {
