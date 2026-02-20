@@ -6,7 +6,13 @@ export async function GET() {
   try {
     const conversations = await prisma.conversation.findMany({
       orderBy: { updatedAt: "desc" },
-      select: { id: true, title: true, model: true, updatedAt: true },
+      select: {
+        id: true,
+        title: true,
+        model: true,
+        updatedAt: true,
+        memoryEnabled: true,
+      },
     });
     return NextResponse.json(conversations);
   } catch (err) {
@@ -18,16 +24,17 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const config = await getAppConfig();
     let model = body.model;
     if (!model) {
-      const config = await getAppConfig();
       model = config.defaultModel;
     }
     const conversation = await prisma.conversation.create({
-      data: { 
+      data: {
         model,
         ragEnabled: body.ragEnabled ?? true,
-       },
+        memoryEnabled: true,
+      },
     });
     return NextResponse.json(conversation);
   } catch (err) {

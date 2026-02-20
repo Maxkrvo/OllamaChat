@@ -6,6 +6,7 @@ interface Config {
   defaultModel: string;
   codeModel: string;
   embeddingModel: string;
+  memoryTokenBudget: number;
 }
 
 const FIELDS = [
@@ -85,6 +86,31 @@ export function SettingsForm() {
             <p className="mt-1 text-xs text-zinc-400">{desc}</p>
           </div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* Memory capture is always-on; only the injection budget is configurable. */}
+        <div className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
+          Memory capture is automatic on every turn.
+        </div>
+        <div>
+          <label className="mb-1 block text-sm text-zinc-500">
+            Memory Token Budget
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={8000}
+            value={config.memoryTokenBudget}
+            onChange={(e) =>
+              setConfig({ ...config, memoryTokenBudget: Number(e.target.value) })
+            }
+            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+          />
+          <p className="mt-1 text-xs text-zinc-400">
+            Approx token estimate uses `content.length / 4`.
+          </p>
+        </div>
       </div>
 
       <button

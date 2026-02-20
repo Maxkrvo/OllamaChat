@@ -12,6 +12,8 @@ A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](htt
 - **Smart model routing**: "Auto" mode detects code patterns and routes to your configured code model automatically
 - **System prompts**: set a custom system prompt per conversation to control the model's behavior
 - **Grounded responses**: assistant messages include confidence + citations when RAG context is used
+- **Persistent memory**: automatic memory capture from conversation turns (`preference`, `fact`, `decision`)
+- **Memory transparency**: assistant responses show which memory items were injected automatically
 - **Configurable models**: set your default, code, and embedding models from the in-app settings panel — works with whatever you have installed
 - **Dark mode**: mobile-responsive, conversation management
 
@@ -31,7 +33,10 @@ Upload documents or paste URLs to build a searchable knowledge base. When RAG is
 <details>
 <summary><strong>Settings</strong></summary>
 
-Configure the RAG pipeline parameters from the settings page.
+Configure model, memory, and RAG parameters from the settings page.
+
+- **Automatic memory capture**: memory extraction runs on every completed turn
+- **Memory token budget**: max prompt budget used for memory injection (approximation: `content.length / 4`)
 
 - **RAG toggle**: enable or disable RAG globally
 - **Chunk size / overlap**: control how documents are split into chunks (100–2000 tokens, 0–500 overlap)
@@ -40,6 +45,22 @@ Configure the RAG pipeline parameters from the settings page.
 - **Embedding model**: select which Ollama model generates embeddings (default: `nomic-embed-text`)
 - **Watched folders**: add local directories for automatic file indexing via file watcher
 - **Supported file types**: toggle which file extensions are indexed
+
+</details>
+
+<details>
+<summary><strong>Memory</strong></summary>
+
+Memory is **automatic with user review controls**:
+
+- **Memory page (`/memory`)**: review, search, filter, edit, archive, and restore auto-captured memory items
+- **Scopes**:
+  - `global`: available to all conversations
+  - `conversation`: only injected into a specific conversation
+- **Types**: `preference`, `fact`, `decision`
+- **Usage tracking**: each memory item records `useCount` and `lastUsedAt`
+- **Auto-capture tags**: automatically extracted memories are tagged with `auto`
+- **Prompt injection order**: system prompt → memory → RAG → conversation history
 
 </details>
 
@@ -89,6 +110,7 @@ On first run, the app auto-detects your installed models and picks defaults.
 
 - **Routing logic**: edit `src/lib/router.ts` to change which patterns trigger the code model.
 - **System prompt**: click the "System Prompt" toggle below the chat header to set per conversation instructions.
+- **Memory ranking/budget logic**: edit `src/lib/memory/index.ts`.
 - **Remote Ollama**: set `OLLAMA_BASE_URL` in `.env` to point at a GPU server running Ollama.
 
 ## Grounding and Citations
@@ -119,6 +141,7 @@ src/lib/
 │   ├── resolve-model  # Smart router wrapper (auto → code/default model)
 │   ├── context        # Message building, system prompt + RAG injection
 │   └── index          # Barrel exports
+├── memory/            # Memory selection, ranking, injection, tag/usage helpers
 ├── rag/               # RAG pipeline
 │   ├── embeddings     # Ollama embedding API
 │   ├── vector-db      # libSQL vector search

@@ -4,6 +4,7 @@ CREATE TABLE "Conversation" (
     "title" TEXT NOT NULL DEFAULT 'New Chat',
     "model" TEXT NOT NULL DEFAULT 'auto',
     "ragEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "memoryEnabled" BOOLEAN NOT NULL DEFAULT true,
     "systemPrompt" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
@@ -19,6 +20,7 @@ CREATE TABLE "Message" (
     "groundingReason" TEXT,
     "groundingAvgSimilarity" REAL,
     "groundingUsedChunkCount" INTEGER,
+    "usedMemoryIds" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "conversationId" TEXT NOT NULL,
     CONSTRAINT "Message_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -71,7 +73,28 @@ CREATE TABLE "AppConfig" (
     "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'singleton',
     "defaultModel" TEXT NOT NULL DEFAULT '',
     "codeModel" TEXT NOT NULL DEFAULT '',
-    "embeddingModel" TEXT NOT NULL DEFAULT ''
+    "embeddingModel" TEXT NOT NULL DEFAULT '',
+    "memoryTokenBudget" INTEGER NOT NULL DEFAULT 2000
+);
+
+-- CreateTable
+CREATE TABLE "MemoryItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "type" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "scope" TEXT NOT NULL,
+    "conversationId" TEXT,
+    "sourceMessageId" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "supersedesMemoryId" TEXT,
+    "tags" TEXT NOT NULL DEFAULT '[]',
+    "lastUsedAt" DATETIME,
+    "useCount" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "MemoryItem_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "MemoryItem_sourceMessageId_fkey" FOREIGN KEY ("sourceMessageId") REFERENCES "Message" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "MemoryItem_supersedesMemoryId_fkey" FOREIGN KEY ("supersedesMemoryId") REFERENCES "MemoryItem" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -105,3 +128,9 @@ CREATE INDEX "MessageCitation_messageId_idx" ON "MessageCitation"("messageId");
 
 -- CreateIndex
 CREATE INDEX "MessageCitation_documentId_idx" ON "MessageCitation"("documentId");
+
+-- CreateIndex
+CREATE INDEX "MemoryItem_status_type_scope_updatedAt_idx" ON "MemoryItem"("status", "type", "scope", "updatedAt");
+
+-- CreateIndex
+CREATE INDEX "MemoryItem_conversationId_status_idx" ON "MemoryItem"("conversationId", "status");

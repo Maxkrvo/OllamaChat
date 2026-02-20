@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -18,12 +21,19 @@ export interface GroundingInfo {
   reason: string;
 }
 
+export interface UsedMemory {
+  id: string;
+  type: "preference" | "fact" | "decision";
+  content: string;
+}
+
 interface MessageProps {
   role: "user" | "assistant";
   content: string;
   model?: string | null;
   citations?: MessageCitation[];
   grounding?: GroundingInfo;
+  usedMemories?: UsedMemory[];
 }
 
 export function Message({
@@ -32,17 +42,24 @@ export function Message({
   model,
   citations,
   grounding,
+  usedMemories,
 }: MessageProps) {
   const isUser = role === "user";
+  const [memoryExpanded, setMemoryExpanded] = useState(false);
 
   return (
-    <div className={`flex gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className="max-w-[80%]">
+    <div className={`flex w-full gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
+      {!isUser && (
+        <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-semibold text-white">
+          AI
+        </div>
+      )}
+      <div className={`${isUser ? "max-w-[75%]" : "w-full max-w-3xl"}`}>
         <div
-          className={`rounded-2xl px-4 py-3 ${
+          className={`px-4 py-3 ${
             isUser
-              ? "bg-blue-600 text-white"
-              : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+              ? "rounded-3xl bg-blue-600 text-white dark:bg-blue-600"
+              : "rounded-xl border border-zinc-200/60 bg-white text-zinc-900 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-100"
           }`}
         >
           {isUser ? (
@@ -59,11 +76,9 @@ export function Message({
           )}
         </div>
         {!isUser && (
-          <div className="mt-1">
-            <div className="flex items-center gap-2">
-              {model && (
-                <span className="text-xs text-zinc-400">{model}</span>
-              )}
+          <div className="mt-2 pl-1">
+            <div className="flex flex-wrap items-center gap-2">
+              {model && <span className="text-xs text-zinc-400">{model}</span>}
               {grounding && (
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
@@ -84,8 +99,36 @@ export function Message({
                 </span>
               )}
             </div>
-            {citations && citations.length > 0 && (
-              <RagSources sources={citations} />
+
+            {citations && citations.length > 0 && <RagSources sources={citations} />}
+
+            {usedMemories && usedMemories.length > 0 && (
+              <div className="mt-1">
+                <button
+                  onClick={() => setMemoryExpanded((v) => !v)}
+                  className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                >
+                  <svg
+                    className={`h-3 w-3 transition-transform ${memoryExpanded ? "rotate-90" : ""}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  {usedMemories.length} memory item{usedMemories.length !== 1 ? "s" : ""} used
+                </button>
+                {memoryExpanded && (
+                  <div className="mt-1 space-y-1 pl-4">
+                    {usedMemories.map((memory) => (
+                      <div key={memory.id} className="text-xs text-zinc-400">
+                        [{memory.type}] {memory.content}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}

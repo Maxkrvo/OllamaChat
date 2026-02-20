@@ -11,11 +11,13 @@ model Conversation {
   id         String    @id @default(cuid())
   title      String    @default("New Chat")
   model      String    @default("auto")
-  ragEnabled   Boolean   @default(true)
-  systemPrompt String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  messages     Message[]
+  ragEnabled    Boolean   @default(true)
+  memoryEnabled Boolean   @default(true)
+  systemPrompt  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  messages      Message[]
+  memoryItems   MemoryItem[]
 }
 
 model Message {
@@ -27,10 +29,12 @@ model Message {
   groundingReason     String?
   groundingAvgSimilarity Float?
   groundingUsedChunkCount Int?
+  usedMemoryIds     String? // JSON array of memory item IDs injected for this assistant response
   createdAt      DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
   citations      MessageCitation[]
+  sourceMemories MemoryItem[] @relation("MemorySourceMessage")
 
   @@index([conversationId])
 }
@@ -102,4 +106,28 @@ model AppConfig {
   defaultModel   String @default("")
   codeModel      String @default("")
   embeddingModel String @default("")
+  memoryTokenBudget Int @default(2000)
+}
+
+model MemoryItem {
+  id                String        @id @default(cuid())
+  type              String        // "preference" | "fact" | "decision"
+  content           String
+  scope             String        // "global" | "conversation"
+  conversationId    String?
+  sourceMessageId   String?
+  status            String        @default("active") // "active" | "archived"
+  supersedesMemoryId String?
+  tags              String        @default("[]")
+  lastUsedAt        DateTime?
+  useCount          Int           @default(0)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  conversation      Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sourceMessage     Message?      @relation("MemorySourceMessage", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+  supersedesMemory  MemoryItem?   @relation("MemorySupersede", fields: [supersedesMemoryId], references: [id], onDelete: SetNull)
+  supersededBy      MemoryItem[]  @relation("MemorySupersede")
+
+  @@index([status, type, scope, updatedAt])
+  @@index([conversationId, status])
 }

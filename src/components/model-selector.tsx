@@ -23,7 +23,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+      className="rounded-xl border border-zinc-300/60 bg-white px-3 py-1.5 text-sm dark:border-zinc-700/60 dark:bg-zinc-800 dark:text-zinc-100"
     >
       <option value="auto">Auto</option>
       {models.map((m) => (

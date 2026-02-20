@@ -5,6 +5,7 @@ export interface AppConfigData {
   defaultModel: string;
   codeModel: string;
   embeddingModel: string;
+  memoryTokenBudget: number;
 }
 
 export async function getAppConfig(): Promise<AppConfigData> {
@@ -22,11 +23,13 @@ export async function getAppConfig(): Promise<AppConfigData> {
         defaultModel: config?.defaultModel || first,
         codeModel: config?.codeModel || first,
         embeddingModel: config?.embeddingModel || "nomic-embed-text",
+        memoryTokenBudget: config?.memoryTokenBudget ?? 2000,
       },
       create: {
         defaultModel: first,
         codeModel: first,
         embeddingModel: "nomic-embed-text",
+        memoryTokenBudget: 2000,
       },
     });
   }
@@ -35,6 +38,7 @@ export async function getAppConfig(): Promise<AppConfigData> {
     defaultModel: config.defaultModel,
     codeModel: config.codeModel,
     embeddingModel: config.embeddingModel,
+    memoryTokenBudget: config.memoryTokenBudget,
   };
 }
 
@@ -48,11 +52,13 @@ export async function updateAppConfig(
       defaultModel: data.defaultModel || "",
       codeModel: data.codeModel || "",
       embeddingModel: data.embeddingModel || "",
+      memoryTokenBudget: data.memoryTokenBudget ?? 2000,
     },
   });
   return {
     defaultModel: config.defaultModel,
     codeModel: config.codeModel,
     embeddingModel: config.embeddingModel,
+    memoryTokenBudget: config.memoryTokenBudget,
   };
 }

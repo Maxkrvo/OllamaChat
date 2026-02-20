@@ -10,10 +10,10 @@ export function RagToggle({ enabled, onChange }: RagToggleProps) {
     <button
       onClick={() => onChange(!enabled)}
       title={enabled ? "RAG enabled — click to disable" : "RAG disabled — click to enable"}
-      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+      className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors ${
         enabled
-          ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-          : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
       }`}
     >
       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

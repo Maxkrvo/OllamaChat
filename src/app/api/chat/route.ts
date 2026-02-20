@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
+import { getAppConfig } from "@/lib/config";
 import { streamChat } from "@/lib/ollama";
 import {
   resolveModel,
@@ -8,10 +9,17 @@ import {
   injectRagContext,
   injectGroundingPolicy,
 } from "@/lib/chat";
+import {
+  autoCaptureMemoryFromTurn,
+  injectMemoryContext,
+  markMemoryItemsUsed,
+  selectMemoryForPrompt,
+} from "@/lib/memory";
 
 export async function POST(req: NextRequest) {
   try {
     const { conversationId, message } = await req.json();
+    const appConfig = await getAppConfig();
 
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
@@ -22,14 +30,12 @@ export async function POST(req: NextRequest) {
       return new Response("Conversation not found", { status: 404 });
     }
 
-    // Resolve model
     const { model: resolvedModel, reason: routingReason } = await resolveModel(
       conversation.model,
       message
     );
 
-    // Save user message + update timestamp
-    await prisma.message.create({
+    const savedUserMessage = await prisma.message.create({
       data: { conversationId, role: "user", content: message },
     });
     await prisma.conversation.update({
@@ -37,9 +43,19 @@ export async function POST(req: NextRequest) {
       data: { updatedAt: new Date() },
     });
 
-    // Build message array with context injections
     const messages = buildMessages(conversation.messages, message);
     injectSystemPrompt(messages, conversation.systemPrompt);
+
+    // Injection order: system -> memory -> RAG -> history/user turn.
+    const usedMemoryItems = conversation.memoryEnabled
+      ? await selectMemoryForPrompt({
+          conversationId,
+          userMessage: message,
+          tokenBudget: appConfig.memoryTokenBudget,
+        })
+      : [];
+    injectMemoryContext(messages, usedMemoryItems);
+
     const { ragSources, grounding } = await injectRagContext(
       messages,
       message,
@@ -47,7 +63,6 @@ export async function POST(req: NextRequest) {
     );
     injectGroundingPolicy(messages, grounding, conversation.ragEnabled);
 
-    // Stream from Ollama
     const ollamaRes = await streamChat(resolvedModel, messages);
 
     if (!ollamaRes.ok || !ollamaRes.body) {
@@ -68,6 +83,7 @@ export async function POST(req: NextRequest) {
                 routingReason,
                 ragSources,
                 grounding,
+                usedMemoryItems,
               })}\n\n`
             )
           );
@@ -91,7 +107,8 @@ export async function POST(req: NextRequest) {
                   );
                 }
                 if (json.done) {
-                  await prisma.message.create({
+                  // Persist assistant output and the exact memory IDs used for this turn.
+                  const savedAssistantMessage = await prisma.message.create({
                     data: {
                       conversationId,
                       role: "assistant",
@@ -101,6 +118,9 @@ export async function POST(req: NextRequest) {
                       groundingReason: grounding.reason,
                       groundingAvgSimilarity: grounding.avgSimilarity,
                       groundingUsedChunkCount: grounding.usedChunkCount,
+                      usedMemoryIds: usedMemoryItems.length
+                        ? JSON.stringify(usedMemoryItems.map((item) => item.id))
+                        : null,
                       citations: ragSources.length
                         ? {
                             create: dedupeCitations(ragSources).map((source) => ({
@@ -115,7 +135,31 @@ export async function POST(req: NextRequest) {
                     },
                   });
 
-                  // Auto-title from first user message
+                  // Memory bookkeeping is non-critical — don't let failures kill the stream.
+                  try {
+                    if (usedMemoryItems.length) {
+                      await markMemoryItemsUsed(usedMemoryItems.map((item) => item.id));
+                    }
+                    if (conversation.memoryEnabled) {
+                      const capturedMemories = await autoCaptureMemoryFromTurn({
+                        conversationId,
+                        userMessage: message,
+                        assistantMessage: fullContent,
+                        userMessageId: savedUserMessage.id,
+                        assistantMessageId: savedAssistantMessage.id,
+                      });
+                      if (capturedMemories.length > 0) {
+                        controller.enqueue(
+                          new TextEncoder().encode(
+                            `data: ${JSON.stringify({ capturedMemories })}\n\n`
+                          )
+                        );
+                      }
+                    }
+                  } catch (memErr) {
+                    console.error("Memory bookkeeping error (non-fatal):", memErr);
+                  }
+
                   if (conversation.title === "New Chat") {
                     const firstUserMsg = conversation.messages.find(
                       (m) => m.role === "user"
@@ -131,9 +175,7 @@ export async function POST(req: NextRequest) {
                     });
                   }
 
-                  controller.enqueue(
-                    new TextEncoder().encode("data: [DONE]\n\n")
-                  );
+                  controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
                 }
               } catch {
                 // skip malformed JSON lines

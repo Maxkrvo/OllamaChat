@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { parseUsedMemoryIds } from "@/lib/memory";
 
 export async function GET(
   _req: NextRequest,
@@ -22,7 +23,28 @@ export async function GET(
   if (!conversation) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json(conversation);
+
+  // Hydrate stored usedMemoryIds into full memory records for UI display.
+  const usedMemoryIds = new Set(
+    conversation.messages.flatMap((message) => parseUsedMemoryIds(message.usedMemoryIds))
+  );
+  const usedMemoryItems = usedMemoryIds.size
+    ? await prisma.memoryItem.findMany({
+        where: { id: { in: [...usedMemoryIds] } },
+        select: { id: true, type: true, content: true },
+      })
+    : [];
+  const memoryById = new Map(usedMemoryItems.map((item) => [item.id, item]));
+
+  return NextResponse.json({
+    ...conversation,
+    messages: conversation.messages.map((message) => ({
+      ...message,
+      usedMemoryItems: parseUsedMemoryIds(message.usedMemoryIds)
+        .map((memoryId) => memoryById.get(memoryId))
+        .filter(Boolean),
+    })),
+  });
 }
 
 export async function DELETE(
@@ -42,6 +64,7 @@ export async function PATCH(
   const body = await req.json();
   const data: Record<string, unknown> = {};
   if (body.ragEnabled !== undefined) data.ragEnabled = body.ragEnabled;
+  if (body.memoryEnabled !== undefined) data.memoryEnabled = body.memoryEnabled;
   if (body.model !== undefined) data.model = body.model;
   if (body.systemPrompt !== undefined) data.systemPrompt = body.systemPrompt;
   const updated = await prisma.conversation.update({
