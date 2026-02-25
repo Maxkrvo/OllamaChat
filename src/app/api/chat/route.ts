@@ -18,7 +18,7 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
-    const { conversationId, message } = await req.json();
+    const { conversationId, message, model: requestModel } = await req.json();
     const appConfig = await getAppConfig();
 
     const conversation = await prisma.conversation.findUnique({
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { model: resolvedModel, reason: routingReason } = await resolveModel(
-      conversation.model,
+      requestModel || conversation.model,
       message
     );
 
@@ -72,21 +72,26 @@ export async function POST(req: NextRequest) {
     const reader = ollamaRes.body.getReader();
     const decoder = new TextDecoder();
     let fullContent = "";
+    let rawContent = "";
+    let thinking = false;
+    let thinkingSent = false;
+
+    function emit(controller: ReadableStreamDefaultController, data: unknown) {
+      controller.enqueue(
+        new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`)
+      );
+    }
 
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          controller.enqueue(
-            new TextEncoder().encode(
-              `data: ${JSON.stringify({
-                routedModel: resolvedModel,
-                routingReason,
-                ragSources,
-                grounding,
-                usedMemoryItems,
-              })}\n\n`
-            )
-          );
+          emit(controller, {
+            routedModel: resolvedModel,
+            routingReason,
+            ragSources,
+            grounding,
+            usedMemoryItems,
+          });
 
           while (true) {
             const { done, value } = await reader.read();
@@ -99,12 +104,40 @@ export async function POST(req: NextRequest) {
               try {
                 const json = JSON.parse(line);
                 if (json.message?.content) {
-                  fullContent += json.message.content;
-                  controller.enqueue(
-                    new TextEncoder().encode(
-                      `data: ${JSON.stringify({ content: json.message.content })}\n\n`
-                    )
-                  );
+                  const token = json.message.content;
+                  rawContent += token;
+
+                  // Strip <think>…</think> blocks from the stream.
+                  // Buffer tokens while inside a think block and emit a
+                  // `thinking` status so the client can show an indicator.
+                  if (!thinking && rawContent.includes("<think>")) {
+                    thinking = true;
+                    if (!thinkingSent) {
+                      emit(controller, { thinking: true });
+                      thinkingSent = true;
+                    }
+                  }
+
+                  if (thinking) {
+                    if (rawContent.includes("</think>")) {
+                      thinking = false;
+                      // Everything after the closing tag is real content
+                      const after = rawContent.split("</think>").pop()!;
+                      rawContent = after;
+                      if (after) {
+                        fullContent += after;
+                        emit(controller, { content: after, thinking: false });
+                      } else {
+                        emit(controller, { thinking: false });
+                      }
+                    }
+                    // Still inside think block — don't emit content
+                    continue;
+                  }
+
+                  // Not thinking — forward token directly
+                  fullContent += token;
+                  emit(controller, { content: token });
                 }
                 if (json.done) {
                   // Persist assistant output and the exact memory IDs used for this turn.

@@ -74,7 +74,13 @@ CREATE TABLE "AppConfig" (
     "defaultModel" TEXT NOT NULL DEFAULT '',
     "codeModel" TEXT NOT NULL DEFAULT '',
     "embeddingModel" TEXT NOT NULL DEFAULT '',
-    "memoryTokenBudget" INTEGER NOT NULL DEFAULT 2000
+    "memoryTokenBudget" INTEGER NOT NULL DEFAULT 2000,
+    "voiceEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "voiceAutoSpeak" BOOLEAN NOT NULL DEFAULT false,
+    "voiceBaseUrl" TEXT NOT NULL DEFAULT 'http://localhost:8000/v1',
+    "voiceSttModel" TEXT NOT NULL DEFAULT 'Systran/faster-whisper-small',
+    "voiceTtsModel" TEXT NOT NULL DEFAULT 'speaches-ai/Kokoro-82M-v1.0-ONNX-fp16',
+    "voiceTtsVoice" TEXT NOT NULL DEFAULT 'af_heart'
 );
 
 -- CreateTable
@@ -134,3 +140,4 @@ CREATE INDEX "MemoryItem_status_type_scope_updatedAt_idx" ON "MemoryItem"("statu
 
 -- CreateIndex
 CREATE INDEX "MemoryItem_conversationId_status_idx" ON "MemoryItem"("conversationId", "status");
+

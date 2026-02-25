@@ -34,6 +34,7 @@ interface MessageProps {
   citations?: MessageCitation[];
   grounding?: GroundingInfo;
   usedMemories?: UsedMemory[];
+  onSpeak?: () => void;
 }
 
 export function Message({
@@ -43,6 +44,7 @@ export function Message({
   citations,
   grounding,
   usedMemories,
+  onSpeak,
 }: MessageProps) {
   const isUser = role === "user";
   const [memoryExpanded, setMemoryExpanded] = useState(false);
@@ -79,6 +81,15 @@ export function Message({
           <div className="mt-2 pl-1">
             <div className="flex flex-wrap items-center gap-2">
               {model && <span className="text-xs text-zinc-400">{model}</span>}
+              {onSpeak && content && (
+                <button
+                  onClick={onSpeak}
+                  className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                  title="Read aloud"
+                >
+                  Speak
+                </button>
+              )}
               {grounding && (
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${

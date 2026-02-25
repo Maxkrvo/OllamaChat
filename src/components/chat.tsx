@@ -13,6 +13,8 @@ import { SettingsForm } from "./settings-form";
 import { MemoryToggle } from "./memory-toggle";
 import { MemoryCenter } from "./memory-center";
 import { MemoryBadge } from "./memory-badge";
+import { SentenceSplitter } from "@/lib/sentence-splitter";
+import { useVoice } from "@/hooks/use-voice";
 
 interface MessageData {
   id: string;
@@ -55,6 +57,7 @@ export function Chat() {
   const [ragEnabled, setRagEnabled] = useState(true);
   const [memoryEnabled, setMemoryEnabled] = useState(true);
   const [streaming, setStreaming] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [view, setView] = useState<View>("chat");
   const [systemPrompt, setSystemPrompt] = useState<string>("");
@@ -66,6 +69,13 @@ export function Chat() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const systemPromptTimer = useRef<ReturnType<typeof setTimeout>>(null);
   const lastAssistantIdRef = useRef<string | null>(null);
+
+  const voice = useVoice({
+    onTranscription: useCallback(
+      (text: string) => setInput((prev) => [prev, text].filter(Boolean).join(" ").trim()),
+      []
+    ),
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -157,6 +167,7 @@ export function Chat() {
 
   async function sendMessage() {
     if (!input.trim() || streaming) return;
+    voice.stopSpeaking();
 
     let convId = activeId;
     if (!convId) {
@@ -191,6 +202,7 @@ export function Chat() {
     };
     lastAssistantIdRef.current = assistantMessage.id;
     setMessages((prev) => [...prev, assistantMessage]);
+    const sentenceSplitter = new SentenceSplitter();
 
     try {
       const res = await fetch("/api/chat", {
@@ -199,6 +211,7 @@ export function Chat() {
         body: JSON.stringify({
           conversationId: convId,
           message: userMessage.content,
+          model,
         }),
       });
 
@@ -215,13 +228,18 @@ export function Chat() {
         const lines = chunk.split("\n").filter(Boolean);
 
         for (const line of lines) {
-          if (line === "data: [DONE]") continue;
+          if (line === "data: [DONE]") {
+            if (voice.streamingTTSEnabled) {
+              const last = sentenceSplitter.flush();
+              if (last) voice.enqueueSentenceTTS(last.text, last.pause);
+            }
+            continue;
+          }
           if (!line.startsWith("data: ")) continue;
 
           try {
             const json = JSON.parse(line.slice(6));
 
-            // First SSE event carries routing/grounding/source metadata for the assistant turn.
             if (
               "grounding" in json ||
               "routedModel" in json ||
@@ -264,8 +282,18 @@ export function Chat() {
               }));
             }
 
+            if ("thinking" in json) {
+              setThinking(json.thinking);
+            }
+
             if (json.content) {
-              // Subsequent SSE events stream incremental assistant tokens.
+              if (voice.streamingTTSEnabled) {
+                const chunks = sentenceSplitter.push(json.content);
+                for (const chunk of chunks) {
+                  voice.enqueueSentenceTTS(chunk.text, chunk.pause);
+                }
+              }
+
               setMessages((prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
@@ -298,6 +326,7 @@ export function Chat() {
       });
     } finally {
       setStreaming(false);
+      setThinking(false);
       await loadConversations();
     }
   }
@@ -383,7 +412,16 @@ export function Chat() {
                 {activeId ? "Chat" : "New chat"}
               </span>
               <div className="flex items-center gap-2">
-              <ModelSelector value={model} onChange={setModel} />
+              <ModelSelector value={model} onChange={(m) => {
+                setModel(m);
+                if (activeId) {
+                  fetch(`/api/conversations/${activeId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: m }),
+                  });
+                }
+              }} />
               <RagToggle
                 enabled={ragEnabled}
                 onChange={(enabled) => {
@@ -410,6 +448,35 @@ export function Chat() {
                   }
                 }}
               />
+              {voice.voiceEnabled && (
+                <>
+                  <button
+                    onClick={voice.toggleAutoSpeak}
+                    className={`rounded-lg px-2 py-1 text-xs ${
+                      voice.voiceAutoSpeak
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                    }`}
+                    title="Auto-speak assistant replies"
+                  >
+                    {voice.voiceAutoSpeak ? "Voice On" : "Voice Off"}
+                  </button>
+                  {voice.speaking && (
+                    <button
+                      onClick={voice.stopSpeaking}
+                      className="rounded-lg bg-zinc-100 px-2 py-1 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                      title="Stop voice playback"
+                    >
+                      Stop
+                    </button>
+                  )}
+                  {!voice.voiceHealthy && (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      Voice unavailable
+                    </span>
+                  )}
+                </>
+              )}
               <ThemeToggle />
               </div>
             </header>
@@ -470,7 +537,12 @@ export function Chat() {
                   </div>
                 )}
                 <div className="mx-auto max-w-4xl space-y-6">
-                  {messages.map((msg, i) => (
+                  {messages.map((msg, i) => {
+                    // Hide the empty assistant placeholder while the indicator is shown
+                    if (streaming && msg.role === "assistant" && !msg.content && i === messages.length - 1) {
+                      return null;
+                    }
+                    return (
                     <div key={msg.id || i}>
                       <Message
                         role={msg.role}
@@ -479,6 +551,11 @@ export function Chat() {
                         citations={msg.citations}
                         grounding={msg.grounding}
                         usedMemories={msg.usedMemories}
+                        onSpeak={
+                          msg.role === "assistant" && voice.voiceEnabled && voice.voiceHealthy
+                            ? () => void voice.speakText(msg.content)
+                            : undefined
+                        }
                       />
                       {msg.role === "assistant" &&
                         capturedMemories[msg.id]?.length > 0 && (
@@ -499,15 +576,23 @@ export function Chat() {
                           />
                         )}
                     </div>
-                  ))}
-                  {streaming && messages[messages.length - 1]?.content === "" && (
+                    );
+                  })}
+                  {streaming && (thinking || messages[messages.length - 1]?.content === "") && (
                     <div className="flex justify-start pl-10">
                       <div className="rounded-xl border border-zinc-200/60 bg-white px-4 py-3 dark:border-zinc-700/60 dark:bg-zinc-800">
-                        <div className="flex gap-1">
-                          <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:0ms]" />
-                          <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:150ms]" />
-                          <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:300ms]" />
-                        </div>
+                        {thinking ? (
+                          <div className="flex items-center gap-2 text-sm text-zinc-400">
+                            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+                            Thinking...
+                          </div>
+                        ) : (
+                          <div className="flex gap-1">
+                            <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:0ms]" />
+                            <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:150ms]" />
+                            <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:300ms]" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -527,6 +612,26 @@ export function Chat() {
                   rows={1}
                   className="flex-1 resize-none bg-transparent px-2 py-2 text-sm focus:outline-none"
                 />
+                {voice.voiceEnabled && (
+                  <button
+                    onClick={voice.recording ? voice.stopRecording : voice.startRecording}
+                    disabled={!voice.voiceHealthy || voice.transcribing || streaming}
+                    className={`rounded-2xl px-3 py-2 text-xs font-medium transition-colors ${
+                      voice.recording
+                        ? "bg-red-600 text-white hover:bg-red-700"
+                        : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    title={
+                      !voice.voiceHealthy
+                        ? "Voice provider unavailable"
+                        : voice.recording
+                          ? "Stop recording"
+                          : "Start voice input"
+                    }
+                  >
+                    {voice.transcribing ? "..." : voice.recording ? "Stop" : "Mic"}
+                  </button>
+                )}
                 <button
                   onClick={sendMessage}
                   disabled={!input.trim() || streaming}

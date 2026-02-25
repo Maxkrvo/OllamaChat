@@ -7,6 +7,12 @@ interface Config {
   codeModel: string;
   embeddingModel: string;
   memoryTokenBudget: number;
+  voiceEnabled: boolean;
+  voiceAutoSpeak: boolean;
+  voiceBaseUrl: string;
+  voiceSttModel: string;
+  voiceTtsModel: string;
+  voiceTtsVoice: string;
 }
 
 const FIELDS = [
@@ -113,12 +119,89 @@ export function SettingsForm() {
         </div>
       </div>
 
+      <div className="space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold">Voice</h3>
+            <p className="text-xs text-zinc-400">
+              Optional self-hosted speech provider (OpenAI-compatible audio API).
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={config.voiceEnabled}
+              onChange={(e) => setConfig({ ...config, voiceEnabled: e.target.checked })}
+              className="h-4 w-4 rounded border-zinc-300"
+            />
+            Enable voice
+          </label>
+        </div>
+
+        <p className="text-xs text-zinc-400">
+          API key is read from the <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">VOICE_API_KEY</code> environment variable.
+        </p>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm text-zinc-500">Voice API Base URL</label>
+            <input
+              type="text"
+              value={config.voiceBaseUrl}
+              onChange={(e) => setConfig({ ...config, voiceBaseUrl: e.target.value })}
+              placeholder="http://localhost:8000/v1"
+              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-zinc-500">STT Model</label>
+            <input
+              type="text"
+              value={config.voiceSttModel}
+              onChange={(e) => setConfig({ ...config, voiceSttModel: e.target.value })}
+              placeholder="Systran/faster-whisper-small"
+              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-zinc-500">TTS Model</label>
+            <input
+              type="text"
+              value={config.voiceTtsModel}
+              onChange={(e) => setConfig({ ...config, voiceTtsModel: e.target.value })}
+              placeholder="speaches-ai/Kokoro-82M-v1.0-ONNX-fp16"
+              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-zinc-500">TTS Voice</label>
+            <input
+              type="text"
+              value={config.voiceTtsVoice}
+              onChange={(e) => setConfig({ ...config, voiceTtsVoice: e.target.value })}
+              placeholder="af_heart"
+              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+            />
+          </div>
+        </div>
+
+        <label className="inline-flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={config.voiceAutoSpeak}
+            onChange={(e) => setConfig({ ...config, voiceAutoSpeak: e.target.checked })}
+            className="h-4 w-4 rounded border-zinc-300"
+          />
+          Auto-speak assistant replies
+        </label>
+      </div>
+
       <button
         onClick={handleSave}
         disabled={saving}
         className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
       >
-        {saving ? "Saving..." : saved ? "Saved!" : "Save Models"}
+        {saving ? "Saving..." : saved ? "Saved!" : "Save Settings"}
       </button>
     </section>
   );

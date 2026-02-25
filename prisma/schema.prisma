@@ -107,6 +107,12 @@ model AppConfig {
   codeModel      String @default("")
   embeddingModel String @default("")
   memoryTokenBudget Int @default(2000)
+  voiceEnabled   Boolean @default(false)
+  voiceAutoSpeak Boolean @default(false)
+  voiceBaseUrl   String @default("http://localhost:8000/v1")
+  voiceSttModel  String @default("Systran/faster-whisper-small")
+  voiceTtsModel  String @default("speaches-ai/Kokoro-82M-v1.0-ONNX-fp16")
+  voiceTtsVoice  String @default("af_heart")
 }
 
 model MemoryItem {

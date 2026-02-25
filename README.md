@@ -14,6 +14,7 @@ A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](htt
 - **Grounded responses**: assistant messages include confidence + citations when RAG context is used
 - **Persistent memory**: automatic memory capture from conversation turns (`preference`, `fact`, `decision`)
 - **Memory transparency**: assistant responses show which memory items were injected automatically
+- **Optional self-hosted voice mode**: push-to-talk input + spoken assistant replies via local speech provider
 - **Configurable models**: set your default, code, and embedding models from the in-app settings panel — works with whatever you have installed
 - **Dark mode**: mobile-responsive, conversation management
 
@@ -37,6 +38,8 @@ Configure model, memory, and RAG parameters from the settings page.
 
 - **Automatic memory capture**: memory extraction runs on every completed turn
 - **Memory token budget**: max prompt budget used for memory injection (approximation: `content.length / 4`)
+- **Voice provider settings**: one-time setup for local speech URL + STT/TTS models + voice preset
+- **Voice behavior controls**: enable/disable voice globally and auto-speak assistant replies
 
 - **RAG toggle**: enable or disable RAG globally
 - **Chunk size / overlap**: control how documents are split into chunks (100–2000 tokens, 0–500 overlap)
@@ -96,6 +99,16 @@ Open [http://localhost:3000](http://localhost:3000). The SQLite database is crea
 
 `pnpm db:setup` runs Prisma migrations and sets up the vector column for RAG embeddings.
 
+### Optional: self-hosted voice mode
+
+Push-to-talk input and spoken assistant replies via a local [Speaches](https://github.com/speaches-ai/speaches) sidecar. No cloud APIs — everything runs on your machine.
+
+```bash
+docker compose -f docker-compose.voice.yml up -d   # start Speaches
+```
+
+Then open **Settings → Voice** and enable it. See [VOICE.md](VOICE.md) for the full setup guide, model installation, troubleshooting, and GPU acceleration.
+
 ### 4. Configure models
 
 Click the gear icon in the header to open settings. Choose which of your installed models to use for:
@@ -112,6 +125,8 @@ On first run, the app auto-detects your installed models and picks defaults.
 - **System prompt**: click the "System Prompt" toggle below the chat header to set per conversation instructions.
 - **Memory ranking/budget logic**: edit `src/lib/memory/index.ts`.
 - **Remote Ollama**: set `OLLAMA_BASE_URL` in `.env` to point at a GPU server running Ollama.
+- **Remote speech service**: set `VOICE_BASE_URL`/`VOICE_API_KEY` to any OpenAI-compatible self-hosted speech API.
+- **Voice tone tuning**: set `VOICE_TTS_SPEED` (default `0.92`). A range around `0.9-0.95` often sounds less robotic.
 
 ## Grounding and Citations
 
