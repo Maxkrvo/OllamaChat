@@ -3,16 +3,21 @@
 import { useEffect, useState } from "react";
 
 export function ThemeToggle() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const stored = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    return stored ? stored === "dark" : prefersDark;
-  });
+  const [mounted, setMounted] = useState(false);
+  const [dark, setDark] = useState(false);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
+    const stored = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = stored ? stored === "dark" : prefersDark;
+    setDark(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted) document.documentElement.classList.toggle("dark", dark);
+  }, [dark, mounted]);
 
   function toggle() {
     const next = !dark;
@@ -20,6 +25,8 @@ export function ThemeToggle() {
     document.documentElement.classList.toggle("dark", next);
     localStorage.setItem("theme", next ? "dark" : "light");
   }
+
+  if (!mounted) return <button className="rounded-xl p-2 w-9 h-9" aria-label="Toggle theme" />;
 
   return (
     <button

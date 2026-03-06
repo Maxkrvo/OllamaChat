@@ -14,7 +14,12 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     fetch("/api/models")
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setModels(data);
+        if (Array.isArray(data))
+          setModels(
+            data.filter(
+              (m: string) => !/(embed|embedding)/i.test(m)
+            )
+          );
       })
       .catch(() => {});
   }, []);

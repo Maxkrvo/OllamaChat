@@ -13,6 +13,8 @@ import { SettingsForm } from "./settings-form";
 import { MemoryToggle } from "./memory-toggle";
 import { MemoryCenter } from "./memory-center";
 import { MemoryBadge } from "./memory-badge";
+import { AgentToggle } from "./agent-toggle";
+import type { ToolStep } from "@/lib/tools/types";
 import { SentenceSplitter } from "@/lib/sentence-splitter";
 import { useVoice } from "@/hooks/use-voice";
 
@@ -24,6 +26,7 @@ interface MessageData {
   citations?: MessageCitation[];
   grounding?: GroundingInfo;
   usedMemories?: UsedMemory[];
+  toolSteps?: ToolStep[];
 }
 
 interface ConversationData {
@@ -44,6 +47,7 @@ interface ApiConversationMessage {
   groundingUsedChunkCount?: number | null;
   citations?: MessageCitation[];
   usedMemoryItems?: UsedMemory[];
+  toolSteps?: string | null;
 }
 
 type View = "chat" | "settings" | "knowledge" | "memory";
@@ -56,6 +60,7 @@ export function Chat() {
   const [model, setModel] = useState("auto");
   const [ragEnabled, setRagEnabled] = useState(true);
   const [memoryEnabled, setMemoryEnabled] = useState(true);
+  const [agentEnabled, setAgentEnabled] = useState(true);
   const [streaming, setStreaming] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -122,6 +127,15 @@ export function Chat() {
               ? message.usedMemoryItems
               : undefined;
 
+            let toolSteps: ToolStep[] | undefined;
+            if (message.toolSteps) {
+              try {
+                toolSteps = JSON.parse(message.toolSteps);
+              } catch {
+                // ignore malformed JSON
+              }
+            }
+
             return {
               id: message.id,
               role: message.role,
@@ -130,6 +144,7 @@ export function Chat() {
               citations,
               grounding,
               usedMemories,
+              toolSteps,
             };
           }
         );
@@ -138,6 +153,7 @@ export function Chat() {
         setModel(data.model);
         setRagEnabled(data.ragEnabled ?? true);
         setMemoryEnabled(data.memoryEnabled ?? true);
+        setAgentEnabled(data.agentEnabled ?? true);
         setSystemPrompt(data.systemPrompt ?? "");
         setSystemPromptOpen(!!data.systemPrompt);
       });
@@ -147,7 +163,7 @@ export function Chat() {
     const res = await fetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, ragEnabled }),
+      body: JSON.stringify({ model, ragEnabled, agentEnabled }),
     });
     const conv = await res.json();
     setActiveId(conv.id);
@@ -174,7 +190,7 @@ export function Chat() {
       const res = await fetch("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, ragEnabled }),
+        body: JSON.stringify({ model, ragEnabled, agentEnabled }),
       });
       const conv = await res.json();
       convId = conv.id;
@@ -203,6 +219,7 @@ export function Chat() {
     lastAssistantIdRef.current = assistantMessage.id;
     setMessages((prev) => [...prev, assistantMessage]);
     const sentenceSplitter = new SentenceSplitter();
+    const pendingToolSteps: ToolStep[] = [];
 
     try {
       const res = await fetch("/api/chat", {
@@ -280,6 +297,67 @@ export function Chat() {
                 ...cm,
                 [msgId]: json.capturedMemories,
               }));
+            }
+
+            if ("toolCall" in json) {
+              pendingToolSteps.push({
+                toolName: json.toolCall.name,
+                args: json.toolCall.args,
+                result: "Running…",
+                durationMs: 0,
+              });
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last?.role === "assistant") {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    toolSteps: [...pendingToolSteps],
+                  };
+                }
+                return updated;
+              });
+            }
+
+            if ("toolResult" in json) {
+              // Find the most recent pending step for this tool name
+              let found = false;
+              for (let i = pendingToolSteps.length - 1; i >= 0; i--) {
+                if (
+                  pendingToolSteps[i].toolName === json.toolResult.name &&
+                  pendingToolSteps[i].result === "Running…"
+                ) {
+                  pendingToolSteps[i] = {
+                    ...pendingToolSteps[i],
+                    result: json.toolResult.result,
+                    durationMs: json.toolResult.durationMs,
+                    error: json.toolResult.error ?? false,
+                  };
+                  found = true;
+                  break;
+                }
+              }
+              if (!found && pendingToolSteps.length > 0) {
+                // Fallback: update the last step
+                const last = pendingToolSteps[pendingToolSteps.length - 1];
+                pendingToolSteps[pendingToolSteps.length - 1] = {
+                  ...last,
+                  result: json.toolResult.result,
+                  durationMs: json.toolResult.durationMs,
+                  error: json.toolResult.error ?? false,
+                };
+              }
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last?.role === "assistant") {
+                  updated[updated.length - 1] = {
+                    ...last,
+                    toolSteps: [...pendingToolSteps],
+                  };
+                }
+                return updated;
+              });
             }
 
             if ("thinking" in json) {
@@ -448,6 +526,19 @@ export function Chat() {
                   }
                 }}
               />
+              <AgentToggle
+                enabled={agentEnabled}
+                onChange={(enabled) => {
+                  setAgentEnabled(enabled);
+                  if (activeId) {
+                    fetch(`/api/conversations/${activeId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ agentEnabled: enabled }),
+                    });
+                  }
+                }}
+              />
               {voice.voiceEnabled && (
                 <>
                   <button
@@ -551,6 +642,7 @@ export function Chat() {
                         citations={msg.citations}
                         grounding={msg.grounding}
                         usedMemories={msg.usedMemories}
+                        toolSteps={msg.toolSteps}
                         onSpeak={
                           msg.role === "assistant" && voice.voiceEnabled && voice.voiceHealthy
                             ? () => void voice.speakText(msg.content)

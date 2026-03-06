@@ -13,6 +13,7 @@ model Conversation {
   model      String    @default("auto")
   ragEnabled    Boolean   @default(true)
   memoryEnabled Boolean   @default(true)
+  agentEnabled  Boolean   @default(true)
   systemPrompt  String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -30,6 +31,7 @@ model Message {
   groundingAvgSimilarity Float?
   groundingUsedChunkCount Int?
   usedMemoryIds     String? // JSON array of memory item IDs injected for this assistant response
+  toolSteps         String? // JSON array of ToolStep objects
   createdAt      DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String

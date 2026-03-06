@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
         model,
         ragEnabled: body.ragEnabled ?? true,
         memoryEnabled: true,
+        agentEnabled: body.agentEnabled ?? true,
       },
     });
     return NextResponse.json(conversation);

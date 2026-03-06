@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAppConfig } from "@/lib/config";
-import { streamChat } from "@/lib/ollama";
+import { streamChat, chatOnce } from "@/lib/ollama";
+import type { OllamaMessage } from "@/lib/ollama";
 import {
   resolveModel,
   buildMessages,
@@ -15,6 +16,10 @@ import {
   markMemoryItemsUsed,
   selectMemoryForPrompt,
 } from "@/lib/memory";
+import { TOOLS, executeTool } from "@/lib/tools";
+import type { ToolStep } from "@/lib/tools/types";
+
+const MAX_AGENT_ROUNDS = 5;
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,28 +68,18 @@ export async function POST(req: NextRequest) {
     );
     injectGroundingPolicy(messages, grounding, conversation.ragEnabled);
 
-    const ollamaRes = await streamChat(resolvedModel, messages);
-
-    if (!ollamaRes.ok || !ollamaRes.body) {
-      return new Response("Failed to connect to Ollama", { status: 502 });
-    }
-
-    const reader = ollamaRes.body.getReader();
-    const decoder = new TextDecoder();
-    let fullContent = "";
-    let rawContent = "";
-    let thinking = false;
-    let thinkingSent = false;
-
     function emit(controller: ReadableStreamDefaultController, data: unknown) {
       controller.enqueue(
         new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`)
       );
     }
 
+    const allToolSteps: ToolStep[] = [];
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // Emit initial metadata immediately so the client can render model/RAG info
           emit(controller, {
             routedModel: resolvedModel,
             routingReason,
@@ -92,6 +87,93 @@ export async function POST(req: NextRequest) {
             grounding,
             usedMemoryItems,
           });
+
+          // --- Agentic loop ---
+          let agentMessages: OllamaMessage[] = messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          }));
+
+          if (conversation.agentEnabled) {
+            try {
+              let round = 0;
+              while (round < MAX_AGENT_ROUNDS) {
+                round++;
+
+                const assistantMsg = await chatOnce(
+                  resolvedModel,
+                  agentMessages,
+                  TOOLS
+                );
+
+                // No tool calls — model is ready to answer directly
+                if (
+                  !assistantMsg.tool_calls ||
+                  assistantMsg.tool_calls.length === 0
+                ) {
+                  break;
+                }
+
+                // Append the assistant tool-call message to history
+                agentMessages.push(assistantMsg);
+
+                // Execute each tool call sequentially
+                for (const toolCall of assistantMsg.tool_calls) {
+                  const { name, arguments: args } = toolCall.function;
+
+                  emit(controller, { toolCall: { name, args } });
+
+                  const step = await executeTool(name, args);
+                  allToolSteps.push(step);
+
+                  emit(controller, {
+                    toolResult: {
+                      name: step.toolName,
+                      result: step.result,
+                      durationMs: step.durationMs,
+                      error: step.error ?? false,
+                    },
+                  });
+
+                  // Append tool result to history
+                  agentMessages.push({
+                    role: "tool",
+                    content: step.result,
+                  });
+                }
+              }
+            } catch (agentErr) {
+              // Model may not support tools — fall back to original messages
+              console.warn(
+                "Agent loop error (falling back to standard chat):",
+                agentErr
+              );
+              agentMessages = messages.map((m) => ({
+                role: m.role,
+                content: m.content,
+              }));
+            }
+          }
+
+          // --- Final streaming answer ---
+          const ollamaRes = await streamChat(resolvedModel, agentMessages);
+
+          if (!ollamaRes.ok || !ollamaRes.body) {
+            const errBody = ollamaRes.body
+              ? await ollamaRes.text().catch(() => "")
+              : "";
+            controller.error(
+              new Error(`Ollama stream failed ${ollamaRes.status}: ${errBody}`)
+            );
+            return;
+          }
+
+          const reader = ollamaRes.body.getReader();
+          const decoder = new TextDecoder();
+          let fullContent = "";
+          let rawContent = "";
+          let thinking = false;
+          let thinkingSent = false;
 
           while (true) {
             const { done, value } = await reader.read();
@@ -107,7 +189,6 @@ export async function POST(req: NextRequest) {
                   const token = json.message.content;
                   rawContent += token;
 
-                  // Strip <think>…</think> blocks from the stream.
                   // Buffer tokens while inside a think block and emit a
                   // `thinking` status so the client can show an indicator.
                   if (!thinking && rawContent.includes("<think>")) {
@@ -121,7 +202,6 @@ export async function POST(req: NextRequest) {
                   if (thinking) {
                     if (rawContent.includes("</think>")) {
                       thinking = false;
-                      // Everything after the closing tag is real content
                       const after = rawContent.split("</think>").pop()!;
                       rawContent = after;
                       if (after) {
@@ -131,16 +211,13 @@ export async function POST(req: NextRequest) {
                         emit(controller, { thinking: false });
                       }
                     }
-                    // Still inside think block — don't emit content
                     continue;
                   }
 
-                  // Not thinking — forward token directly
                   fullContent += token;
                   emit(controller, { content: token });
                 }
                 if (json.done) {
-                  // Persist assistant output and the exact memory IDs used for this turn.
                   const savedAssistantMessage = await prisma.message.create({
                     data: {
                       conversationId,
@@ -154,15 +231,20 @@ export async function POST(req: NextRequest) {
                       usedMemoryIds: usedMemoryItems.length
                         ? JSON.stringify(usedMemoryItems.map((item) => item.id))
                         : null,
+                      toolSteps: allToolSteps.length
+                        ? JSON.stringify(allToolSteps)
+                        : null,
                       citations: ragSources.length
                         ? {
-                            create: dedupeCitations(ragSources).map((source) => ({
-                              documentId: source.documentId,
-                              filename: source.filename,
-                              chunkIndex: source.chunkIndex,
-                              score: source.score,
-                              metadata: JSON.stringify(source.metadata),
-                            })),
+                            create: dedupeCitations(ragSources).map(
+                              (source) => ({
+                                documentId: source.documentId,
+                                filename: source.filename,
+                                chunkIndex: source.chunkIndex,
+                                score: source.score,
+                                metadata: JSON.stringify(source.metadata),
+                              })
+                            ),
                           }
                         : undefined,
                     },
@@ -171,7 +253,9 @@ export async function POST(req: NextRequest) {
                   // Memory bookkeeping is non-critical — don't let failures kill the stream.
                   try {
                     if (usedMemoryItems.length) {
-                      await markMemoryItemsUsed(usedMemoryItems.map((item) => item.id));
+                      await markMemoryItemsUsed(
+                        usedMemoryItems.map((item) => item.id)
+                      );
                     }
                     if (conversation.memoryEnabled) {
                       const capturedMemories = await autoCaptureMemoryFromTurn({
@@ -208,7 +292,9 @@ export async function POST(req: NextRequest) {
                     });
                   }
 
-                  controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+                  controller.enqueue(
+                    new TextEncoder().encode("data: [DONE]\n\n")
+                  );
                 }
               } catch {
                 // skip malformed JSON lines

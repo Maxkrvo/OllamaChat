@@ -5,6 +5,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { RagSources } from "./rag-sources";
+import { ToolSteps } from "./tool-steps";
+import type { ToolStep } from "@/lib/tools/types";
 
 export interface MessageCitation {
   id?: string;
@@ -34,6 +36,7 @@ interface MessageProps {
   citations?: MessageCitation[];
   grounding?: GroundingInfo;
   usedMemories?: UsedMemory[];
+  toolSteps?: ToolStep[];
   onSpeak?: () => void;
 }
 
@@ -44,6 +47,7 @@ export function Message({
   citations,
   grounding,
   usedMemories,
+  toolSteps,
   onSpeak,
 }: MessageProps) {
   const isUser = role === "user";
@@ -110,6 +114,8 @@ export function Message({
                 </span>
               )}
             </div>
+
+            {toolSteps && toolSteps.length > 0 && <ToolSteps steps={toolSteps} />}
 
             {citations && citations.length > 0 && <RagSources sources={citations} />}
 
