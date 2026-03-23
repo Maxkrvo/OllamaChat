@@ -44,7 +44,16 @@ export function SettingsForm() {
       fetch("/api/models").then((r) => r.json()),
       fetch("/api/config").then((r) => r.json()),
     ]).then(([modelList, cfg]) => {
-      if (Array.isArray(modelList)) setModels(modelList);
+      if (Array.isArray(modelList)) {
+        const parsed = modelList
+          .map((model) =>
+            typeof model === "string"
+              ? model
+              : (model?.name ?? model?.model ?? model?.id ?? ""),
+          )
+          .filter((model): model is string => Boolean(model));
+        setModels(parsed);
+      }
       setConfig(cfg);
     });
   }, []);
@@ -83,8 +92,8 @@ export function SettingsForm() {
               onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
               className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800"
             >
-              {models.map((m) => (
-                <option key={m} value={m}>
+              {models.map((m, i) => (
+                <option key={`${m}-${i}`} value={m}>
                   {m}
                 </option>
               ))}
