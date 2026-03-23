@@ -7,6 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import { RagSources } from "./rag-sources";
 import { ToolSteps } from "./tool-steps";
 import type { ToolStep } from "@/lib/tools/types";
+import type { StoredImage } from "./chat";
 
 export interface MessageCitation {
   id?: string;
@@ -37,6 +38,7 @@ interface MessageProps {
   grounding?: GroundingInfo;
   usedMemories?: UsedMemory[];
   toolSteps?: ToolStep[];
+  images?: StoredImage[];
   onSpeak?: () => void;
 }
 
@@ -48,6 +50,7 @@ export function Message({
   grounding,
   usedMemories,
   toolSteps,
+  images,
   onSpeak,
 }: MessageProps) {
   const isUser = role === "user";
@@ -69,7 +72,21 @@ export function Message({
           }`}
         >
           {isUser ? (
-            <p className="whitespace-pre-wrap">{content}</p>
+            <>
+              {images && images.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {images.map((img, i) => (
+                    <img
+                      key={i}
+                      src={`data:${img.mimeType};base64,${img.base64}`}
+                      alt={`Attached image ${i + 1}`}
+                      className="max-h-48 max-w-48 rounded-lg object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+              <p className="whitespace-pre-wrap">{content}</p>
+            </>
           ) : (
             <div className="prose max-w-none overflow-x-auto text-sm">
               <ReactMarkdown

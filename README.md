@@ -9,7 +9,8 @@ A self-hosted ChatGPT-style web app that runs on your machine using [Ollama](htt
 ## Features
 
 - **Chat interface**: streaming responses, markdown with syntax highlighting, conversation history
-- **Smart model routing**: "Auto" mode detects code patterns and routes to your configured code model automatically
+- **Vision / image input**: attach images via button, drag-and-drop, or clipboard paste — auto-routes to a vision-capable model
+- **Smart model routing**: "Auto" mode detects code patterns and routes to your configured code model, and detects images to route to a vision model
 - **System prompts**: set a custom system prompt per conversation to control the model's behavior
 - **Grounded responses**: assistant messages include confidence + citations when RAG context is used
 - **Persistent memory**: automatic memory capture from conversation turns (`preference`, `fact`, `decision`)
@@ -82,6 +83,7 @@ ollama serve          # or open the desktop app
 ollama pull gemma2:9b          # lightweight general model
 ollama pull qwen3:14b          # larger general model
 ollama pull qwen3-coder:30b    # coding specialist
+ollama pull llama3.2-vision    # vision model for image input
 ollama pull nomic-embed-text   # embeddings for RAG
 ```
 
@@ -116,6 +118,8 @@ Click the gear icon in the header to open settings. Choose which of your install
 - **Default Model** — general conversations
 - **Code Model** — used by Auto mode when code is detected in your prompt
 - **Embedding Model** — used for RAG document embeddings
+
+Vision-capable models are tagged with **(vision)** in the model selector. When images are attached in Auto mode, the app auto-routes to the first available vision model.
 
 On first run, the app auto-detects your installed models and picks defaults.
 
@@ -162,8 +166,10 @@ src/lib/
 │   ├── vector-db      # libSQL vector search
 │   ├── chunker        # Document-aware chunking
 │   └── parsers/       # Markdown, PDF, code, URL parsers
+├── tools/             # Agent tool definitions + executor (web_search, fetch_url)
+├── voice/             # Voice STT/TTS integration (Speaches)
 ├── router             # Pattern-matching code detection
-├── ollama             # Ollama HTTP API wrapper
+├── ollama             # Ollama HTTP API wrapper (chat, embeddings, model capabilities)
 ├── config             # App configuration (DB-backed)
 └── db                 # Prisma client singleton
 ```

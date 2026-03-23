@@ -5,6 +5,7 @@ const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
 export interface OllamaMessage {
   role: string;
   content: string;
+  images?: string[]; // base64-encoded image strings for vision models
   tool_calls?: Array<{
     function: { name: string; arguments: Record<string, unknown> };
   }>;
@@ -19,7 +20,7 @@ export async function listModels(): Promise<string[]> {
 
 export function streamChat(
   model: string,
-  messages: { role: string; content: string }[],
+  messages: OllamaMessage[],
   tools?: OllamaTool[]
 ) {
   return fetch(`${OLLAMA_BASE}/api/chat`, {
@@ -32,6 +33,21 @@ export function streamChat(
       ...(tools && tools.length > 0 ? { tools } : {}),
     }),
   });
+}
+
+export interface OllamaModelInfo {
+  capabilities: string[]; // e.g. ["completion", "vision", "tools"]
+}
+
+export async function showModel(model: string): Promise<OllamaModelInfo> {
+  const res = await fetch(`${OLLAMA_BASE}/api/show`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model }),
+  });
+  if (!res.ok) throw new Error(`Failed to get model info: ${res.status}`);
+  const data = await res.json();
+  return { capabilities: data.capabilities || [] };
 }
 
 export async function chatOnce(

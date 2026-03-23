@@ -23,7 +23,8 @@ const MAX_AGENT_ROUNDS = 5;
 
 export async function POST(req: NextRequest) {
   try {
-    const { conversationId, message, model: requestModel } = await req.json();
+    const { conversationId, message, model: requestModel, images } = await req.json();
+    // images: Array<{ base64: string; mimeType: string }> | undefined
     const appConfig = await getAppConfig();
 
     const conversation = await prisma.conversation.findUnique({
@@ -35,20 +36,31 @@ export async function POST(req: NextRequest) {
       return new Response("Conversation not found", { status: 404 });
     }
 
+    const hasImages = Array.isArray(images) && images.length > 0;
     const { model: resolvedModel, reason: routingReason } = await resolveModel(
       requestModel || conversation.model,
-      message
+      message,
+      hasImages
     );
 
     const savedUserMessage = await prisma.message.create({
-      data: { conversationId, role: "user", content: message },
+      data: {
+        conversationId,
+        role: "user",
+        content: message,
+        images: hasImages ? JSON.stringify(images) : null,
+      },
     });
     await prisma.conversation.update({
       where: { id: conversationId },
       data: { updatedAt: new Date() },
     });
 
-    const messages = buildMessages(conversation.messages, message);
+    // Extract raw base64 strings for Ollama (only current message images)
+    const userImageBase64s = hasImages
+      ? (images as Array<{ base64: string }>).map((img) => img.base64)
+      : undefined;
+    const messages = buildMessages(conversation.messages, message, userImageBase64s);
     injectSystemPrompt(messages, conversation.systemPrompt);
 
     // Injection order: system -> memory -> RAG -> history/user turn.
@@ -92,6 +104,7 @@ export async function POST(req: NextRequest) {
           let agentMessages: OllamaMessage[] = messages.map((m) => ({
             role: m.role,
             content: m.content,
+            ...(m.images?.length ? { images: m.images } : {}),
           }));
 
           if (conversation.agentEnabled) {
@@ -151,6 +164,7 @@ export async function POST(req: NextRequest) {
               agentMessages = messages.map((m) => ({
                 role: m.role,
                 content: m.content,
+                ...(m.images?.length ? { images: m.images } : {}),
               }));
             }
           }

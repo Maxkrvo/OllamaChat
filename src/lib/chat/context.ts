@@ -3,6 +3,7 @@ import { retrieveContext } from "@/lib/rag";
 export interface ChatMessage {
   role: string;
   content: string;
+  images?: string[]; // base64-encoded image strings for vision models
 }
 
 export interface RagSource {
@@ -30,11 +31,16 @@ export interface RagInjectionResult {
 /** Build the message array from conversation history + new user message. */
 export function buildMessages(
   history: { role: string; content: string }[],
-  userMessage: string
+  userMessage: string,
+  userImages?: string[]
 ): ChatMessage[] {
   return [
     ...history.map((m) => ({ role: m.role, content: m.content })),
-    { role: "user", content: userMessage },
+    {
+      role: "user",
+      content: userMessage,
+      ...(userImages?.length ? { images: userImages } : {}),
+    },
   ];
 }
 

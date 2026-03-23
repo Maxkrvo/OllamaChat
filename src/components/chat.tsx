@@ -14,9 +14,16 @@ import { MemoryToggle } from "./memory-toggle";
 import { MemoryCenter } from "./memory-center";
 import { MemoryBadge } from "./memory-badge";
 import { AgentToggle } from "./agent-toggle";
+import { ImagePreview } from "./image-preview";
 import type { ToolStep } from "@/lib/tools/types";
 import { SentenceSplitter } from "@/lib/sentence-splitter";
 import { useVoice } from "@/hooks/use-voice";
+import { useImageUpload } from "@/hooks/use-image-upload";
+
+export interface StoredImage {
+  base64: string;
+  mimeType: string;
+}
 
 interface MessageData {
   id: string;
@@ -27,6 +34,7 @@ interface MessageData {
   grounding?: GroundingInfo;
   usedMemories?: UsedMemory[];
   toolSteps?: ToolStep[];
+  images?: StoredImage[];
 }
 
 interface ConversationData {
@@ -48,6 +56,7 @@ interface ApiConversationMessage {
   citations?: MessageCitation[];
   usedMemoryItems?: UsedMemory[];
   toolSteps?: string | null;
+  images?: string | null;
 }
 
 type View = "chat" | "settings" | "knowledge" | "memory";
@@ -81,6 +90,16 @@ export function Chat() {
       []
     ),
   });
+
+  const imageUpload = useImageUpload();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Listen for paste events to capture pasted images
+  useEffect(() => {
+    const handler = imageUpload.handlePaste;
+    document.addEventListener("paste", handler);
+    return () => document.removeEventListener("paste", handler);
+  }, [imageUpload.handlePaste]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -136,6 +155,15 @@ export function Chat() {
               }
             }
 
+            let images: StoredImage[] | undefined;
+            if (message.images) {
+              try {
+                images = JSON.parse(message.images);
+              } catch {
+                // ignore malformed JSON
+              }
+            }
+
             return {
               id: message.id,
               role: message.role,
@@ -145,6 +173,7 @@ export function Chat() {
               grounding,
               usedMemories,
               toolSteps,
+              images,
             };
           }
         );
@@ -182,7 +211,7 @@ export function Chat() {
   }
 
   async function sendMessage() {
-    if (!input.trim() || streaming) return;
+    if ((!input.trim() && imageUpload.images.length === 0) || streaming) return;
     voice.stopSpeaking();
 
     let convId = activeId;
@@ -197,14 +226,21 @@ export function Chat() {
       setActiveId(convId);
     }
 
+    const pendingImages = imageUpload.images.map((img) => ({
+      base64: img.base64,
+      mimeType: img.mimeType,
+    }));
+
     const userMessage: MessageData = {
       id: `temp-${Date.now()}`,
       role: "user",
       content: input.trim(),
+      images: pendingImages.length > 0 ? pendingImages : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    imageUpload.clearImages();
     setStreaming(true);
 
     if (textareaRef.current) {
@@ -229,6 +265,7 @@ export function Chat() {
           conversationId: convId,
           message: userMessage.content,
           model,
+          images: pendingImages.length > 0 ? pendingImages : undefined,
         }),
       });
 
@@ -606,7 +643,23 @@ export function Chat() {
               </div>
             )}
 
-            <div className="relative min-h-0 flex-1">
+            <div
+              className="relative min-h-0 flex-1"
+              onDragEnter={imageUpload.handleDragEnter}
+              onDragLeave={imageUpload.handleDragLeave}
+              onDragOver={imageUpload.handleDragOver}
+              onDrop={imageUpload.handleDrop}
+            >
+              {imageUpload.isDragging && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-500/10 backdrop-blur-sm">
+                  <div className="rounded-2xl border-2 border-dashed border-blue-400 bg-white/90 px-8 py-6 text-center dark:bg-zinc-800/90">
+                    <svg className="mx-auto mb-2 h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                    </svg>
+                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Drop images here</p>
+                  </div>
+                </div>
+              )}
               <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
                 <Image
                   src="/logoTransparentSmall.webp"
@@ -643,6 +696,7 @@ export function Chat() {
                         grounding={msg.grounding}
                         usedMemories={msg.usedMemories}
                         toolSteps={msg.toolSteps}
+                        images={msg.images}
                         onSpeak={
                           msg.role === "assistant" && voice.voiceEnabled && voice.voiceHealthy
                             ? () => void voice.speakText(msg.content)
@@ -694,7 +748,29 @@ export function Chat() {
             </div>
 
             <div className="bg-white/95 px-4 py-3 backdrop-blur dark:bg-zinc-900/85">
-              <div className="mx-auto flex max-w-4xl items-end gap-2 rounded-3xl border border-zinc-300/50 bg-white px-3 py-2 shadow-sm dark:border-zinc-600/50 dark:bg-zinc-800">
+              <div className="mx-auto max-w-4xl rounded-3xl border border-zinc-300/50 bg-white shadow-sm dark:border-zinc-600/50 dark:bg-zinc-800">
+                <ImagePreview images={imageUpload.images} onRemove={imageUpload.removeImage} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) imageUpload.addFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <div className="flex items-end gap-2 px-3 py-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-2xl px-2 py-2 text-zinc-400 transition-colors hover:text-zinc-600 dark:hover:text-zinc-300"
+                  title="Attach images"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.41a2.25 2.25 0 013.182 0l2.909 2.91m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                  </svg>
+                </button>
                 <textarea
                   ref={textareaRef}
                   value={input}
@@ -726,11 +802,12 @@ export function Chat() {
                 )}
                 <button
                   onClick={sendMessage}
-                  disabled={!input.trim() || streaming}
+                  disabled={(!input.trim() && imageUpload.images.length === 0) || streaming}
                   className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                 >
                   Send
                 </button>
+                </div>
               </div>
             </div>
           </>

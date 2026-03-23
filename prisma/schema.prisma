@@ -30,6 +30,7 @@ model Message {
   groundingReason     String?
   groundingAvgSimilarity Float?
   groundingUsedChunkCount Int?
+  images            String? // JSON array of { base64, mimeType } for vision messages
   usedMemoryIds     String? // JSON array of memory item IDs injected for this assistant response
   toolSteps         String? // JSON array of ToolStep objects
   createdAt      DateTime     @default(now())

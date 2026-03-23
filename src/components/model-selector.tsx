@@ -2,24 +2,31 @@
 
 import { useEffect, useState } from "react";
 
+interface ModelInfo {
+  name: string;
+  supportsVision: boolean;
+}
+
 interface ModelSelectorProps {
   value: string;
   onChange: (model: string) => void;
 }
 
 export function ModelSelector({ value, onChange }: ModelSelectorProps) {
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<ModelInfo[]>([]);
 
   useEffect(() => {
     fetch("/api/models")
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data))
-          setModels(
-            data.filter(
-              (m: string) => !/(embed|embedding)/i.test(m)
+        if (Array.isArray(data)) {
+          const parsed: ModelInfo[] = data
+            .map((m: string | ModelInfo) =>
+              typeof m === "string" ? { name: m, supportsVision: false } : m
             )
-          );
+            .filter((m: ModelInfo) => !/(embed|embedding)/i.test(m.name));
+          setModels(parsed);
+        }
       })
       .catch(() => {});
   }, []);
@@ -32,8 +39,8 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     >
       <option value="auto">Auto</option>
       {models.map((m) => (
-        <option key={m} value={m}>
-          {m}
+        <option key={m.name} value={m.name}>
+          {m.name}{m.supportsVision ? " (vision)" : ""}
         </option>
       ))}
     </select>
