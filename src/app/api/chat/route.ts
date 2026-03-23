@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAppConfig } from "@/lib/config";
-import { streamChat, chatOnce } from "@/lib/ollama";
+import { streamChat, chatOnce, showModel } from "@/lib/ollama";
 import type { OllamaMessage } from "@/lib/ollama";
 import {
   resolveModel,
@@ -107,7 +107,19 @@ export async function POST(req: NextRequest) {
             ...(m.images?.length ? { images: m.images } : {}),
           }));
 
-          if (conversation.agentEnabled) {
+          // Check if model supports tools before entering the agent loop
+          const useAgent = conversation.agentEnabled
+            ? await (async () => {
+                try {
+                  const info = await showModel(resolvedModel);
+                  return info.capabilities.includes("tools");
+                } catch {
+                  return false;
+                }
+              })()
+            : false;
+
+          if (useAgent) {
             try {
               let round = 0;
               while (round < MAX_AGENT_ROUNDS) {
